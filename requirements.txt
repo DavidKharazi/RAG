@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+bs4
+langchain
+langchain_community
+langchain_core
+langchain_openai
+sqlite3
+glob2
