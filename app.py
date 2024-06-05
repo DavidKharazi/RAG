@@ -33,8 +33,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='',
-    aws_secret_access_key='',
+    aws_access_key_id='my_aws_access_key_id',
+    aws_secret_access_key='my_aws_secret_access_key',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/new/'
