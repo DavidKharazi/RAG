@@ -1,7 +1,7 @@
 
 import os
-from typing import Optional, Dict, List, Any
-from langchain.text_splitter import RecursiveCharacterTextSplitter, RecursiveJsonSplitter
+from typing import Optional, Dict, Any
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -33,8 +33,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='YCAJEt7ilkMDiPuuZA--Sgb1H',
-    aws_secret_access_key='YCOJE46MLMRlPll_kl6oIllqvT7P7S65E4QohXLZ',
+    aws_access_key_id='my_aws_access_key_id',
+    aws_secret_access_key='my_aws_secret_access_key',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/new/'
@@ -151,8 +151,6 @@ def get_uploaded_filenames(source) -> List[str]:
         cursor.execute(f"SELECT filename FROM uploaded_docs WHERE global_source = ?", (source,))
         rows = cursor.fetchall()
     filenames = [row[0] for row in rows]
-    if filenames:
-        print('Новых документов не было, пропускаем шаг добавления')
     return filenames
 
 
@@ -219,14 +217,12 @@ def load_jsons(source, bucket: str) -> Tuple[List[Document], List[dict]]:
             try:
                 obj = s3_client.get_object(Bucket=bucket, Key=file)
                 content = json.loads(obj['Body'].read().decode('utf-8'))
-                json_docs.append(content)  # Append the JSON content directly
+                json_docs.append(content)
                 json_metadata.append({'source': file})
             except Exception as e:
                 print(f"Error reading json file {file}: {e}")
 
     return (json_docs, json_metadata) if json_docs else (None, None)
-
-
 
 
 def load_documents(global_source, bucket: str, file_types: List[str]) -> dict:
@@ -250,8 +246,6 @@ def load_documents(global_source, bucket: str, file_types: List[str]) -> dict:
 # Пример использования
 DATA_BUCKET = 'utlik'
 DOCS = load_documents('local', DATA_BUCKET, ['txt', 'json', 'docx'])
-print(DOCS)
-
 
 
 def split_docs_to_chunks(documents: dict, file_types: List[str], chunk_size=2000, chunk_overlap=500):
@@ -261,17 +255,20 @@ def split_docs_to_chunks(documents: dict, file_types: List[str], chunk_size=2000
         txt_chunks = [text_splitter.split_documents([doc]) for doc in documents['txt']]
         txt_chunks = [item for sublist in txt_chunks for item in sublist]
         all_chunks.extend(txt_chunks)
+
     if 'json' in file_types and documents['json'] is not None:
-        json_splitter = RecursiveJsonSplitter(max_chunk_size=chunk_size)
-        json_chunks = json_splitter.create_documents(documents['json'], metadatas=documents['json_metadata'])
+        json_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        json_chunks = json_splitter.create_documents([json.dumps(doc, ensure_ascii=False) for doc in documents['json']],
+                                                     metadatas=documents['json_metadata'])
         all_chunks.extend(json_chunks)
+
     if 'docx' in file_types and documents['docx'] is not None:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         txt_chunks = [text_splitter.split_documents([doc]) for doc in documents['docx']]
         txt_chunks = [item for sublist in txt_chunks for item in sublist]
         all_chunks.extend(txt_chunks)
-    return all_chunks
 
+    return all_chunks
 
 chunks_res = split_docs_to_chunks(DOCS, ['txt', 'json', 'docx'])
 
@@ -299,7 +296,7 @@ def get_chroma_vectorstore(documents, embeddings, persist_directory):
 
 
 vectorstore = get_chroma_vectorstore(documents=chunks_res, embeddings=embeddings, persist_directory=CHROMA_PATH)
-retriever = vectorstore.as_retriever(search_kwargs={"k": 9}, search_type='similarity')
+retriever = vectorstore.as_retriever(search_kwargs={"k": 2}, search_type='similarity')
 
 
 
