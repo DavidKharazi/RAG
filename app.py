@@ -1,5 +1,3 @@
-
-import os
 from typing import Optional, Dict, Any
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -16,28 +14,33 @@ import boto3
 from fnmatch import fnmatchcase
 import json
 from typing import List, Tuple
+import docx
+import os
+from docx.oxml.ns import qn
+from docx import Document as DocxDocument
+from io import BytesIO
 
 
-os.environ['OPENAI_API_KEY'] = 'api_key'
+os.environ['OPENAI_API_KEY'] = 'my-api-key'
 
-model_name = "gpt-4"
+
+model_name = "gpt-4o"
 temperature = 0
 llm = ChatOpenAI(model=model_name, temperature=temperature)
-
 embeddings = OpenAIEmbeddings()
-#current_user = os.environ.get('USER_NAME')
-current_user = 'UVILS'
+
+current_user = 'A100'
 
 # Настройка клиента для Yandex S3
 session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='my_aws_access_key_id',
-    aws_secret_access_key='my_aws_secret_access_key',
+    aws_access_key_id='my-aws-access-key',
+    aws_secret_access_key='my-aws-secret',
 )
 
-CHROMA_PATH = f'./chroma/{current_user}/new/'
+CHROMA_PATH = f'./chroma/{current_user}/'
 
 
 def init_metadata_db():
@@ -127,22 +130,12 @@ def delete_filename_from_metadata(source, filename):
         conn.execute(f'''DELETE from uploaded_docs where global_source = '{source}' and filename ='{filename}' ; ''')
 
 
-def get_uploaded_filenames(global_source):
-    with sqlite3.connect('metadata.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"select * from uploaded_docs where global_source = '{global_source}' ")
-        rows = cursor.fetchall()
-    unique_list = [f"{row[2]}" for row in rows]
-    return unique_list
-
-
 
 class Document:
     def __init__(self, source: str, page_content: str, metadata: Optional[Dict[str, Any]] = None):
         self.source = source
         self.page_content = page_content
         self.metadata = metadata if metadata is not None else {'source': source}
-
 
 
 def get_uploaded_filenames(source) -> List[str]:
@@ -155,20 +148,22 @@ def get_uploaded_filenames(source) -> List[str]:
 
 
 def load_s3_files(bucket: str, prefix: str, suffix: str) -> List[str]:
+    """List files in a given S3 bucket with a specified prefix and suffix."""
     try:
         response = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        contents = response.get('Contents', [])
-        if not contents:
-            return []
-        files = [content['Key'] for content in contents if content['Key'].endswith(suffix)]
+        files = [content['Key'] for content in response.get('Contents', []) if content['Key'].endswith(suffix)]
+        if not files:
+            print(f"No files found in bucket {bucket} with prefix {prefix} and suffix {suffix}")
+        else:
+            print(f"Files found in bucket {bucket} with prefix {prefix} and suffix {suffix}: {files}")
         return files
     except Exception as e:
-        print(f"Error loading S3 files: {e}")
+        print(f"Error listing files in bucket {bucket} with prefix {prefix} and suffix {suffix}: {e}")
         return []
 
 
 def load_docx_new(source, bucket: str) -> List[Document]:
-    prefix = 'UVILS/docx/'
+    prefix = 'A100/docx/'
     suffix = '.docx'
     files = load_s3_files(bucket, prefix, suffix)
     uniq_files = get_uploaded_filenames(source) or []
@@ -178,16 +173,57 @@ def load_docx_new(source, bucket: str) -> List[Document]:
         if not any(fnmatchcase(file, f"*{pattern}*") for pattern in uniq_files):
             try:
                 obj = s3_client.get_object(Bucket=bucket, Key=file)
-                content = obj['Body'].read().decode('utf-8')
+                content = obj['Body'].read()
+
+                # Используем BytesIO для чтения содержимого файла как бинарного потока
+                doc_stream = BytesIO(content)
+                doc = DocxDocument(doc_stream)
+
+                # Извлекаем текст из документа docx
+                full_text = []
+                image_counter = 1
+
+                # Получаем имя файла без расширения и создаем соответствующую папку
+                filename_without_extension = os.path.splitext(os.path.basename(file))[0]
+                image_folder = filename_without_extension  # Используем оригинальное имя файла для папки
+
+                for para in doc.paragraphs:
+                    # Обработка параграфов для создания ссылок на изображения
+                    para_text = para.text
+                    for run in para.runs:
+                        for drawing in run.element.findall('.//a:blip', namespaces={
+                            'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}):
+                            image_rId = drawing.get(qn('r:embed'))
+                            image_part = doc.part.related_parts[image_rId]
+                            image_filename = f'image_{image_counter:02d}.{image_part.content_type.split("/")[-1]}'
+                            image_counter += 1
+
+                            # Загрузка изображения в бакет Яндекса
+                            img_content = image_part.blob
+                            s3_image_key = f"A100/images/{image_folder}/{image_filename}"
+                            s3_client.put_object(
+                                Bucket=bucket,
+                                Key=s3_image_key,
+                                Body=img_content,
+                                ContentDisposition='inline',
+                                ContentType=image_part.content_type
+                            )
+
+                            # Генерация URL для изображения
+                            s3_image_url = f"https://storage.yandexcloud.net/{bucket}/{s3_image_key}"
+                            para_text += f'\n{s3_image_url}'
+                    full_text.append(para_text)
+                content = '\n'.join(full_text)
+
                 docs.append(Document(source=file, page_content=content))
             except Exception as e:
-                print(f"Error reading txt file {file}: {e}")
+                print(f"Error reading docx file {file}: {e}")
 
     return docs if docs else None
 
 
 def load_txts(source, bucket: str) -> List[Document]:
-    prefix = 'UVILS/txt/'
+    prefix = f'{current_user}/txt/'
     suffix = '.txt'
     files = load_s3_files(bucket, prefix, suffix)
     uniq_files = get_uploaded_filenames(source) or []
@@ -206,7 +242,7 @@ def load_txts(source, bucket: str) -> List[Document]:
 
 
 def load_jsons(source, bucket: str) -> Tuple[List[Document], List[dict]]:
-    prefix = 'UVILS/json/'
+    prefix = f'{current_user}/json/'
     suffix = '.json'
     files = load_s3_files(bucket, prefix, suffix)
     uniq_files = get_uploaded_filenames(source) or []
@@ -245,7 +281,7 @@ def load_documents(global_source, bucket: str, file_types: List[str]) -> dict:
 
 # Пример использования
 DATA_BUCKET = 'utlik'
-DOCS = load_documents('local', DATA_BUCKET, ['txt', 'json', 'docx'])
+DOCS = load_documents('s3', DATA_BUCKET, ['txt', 'json', 'docx'])
 
 
 def split_docs_to_chunks(documents: dict, file_types: List[str], chunk_size=2000, chunk_overlap=500):
@@ -270,6 +306,7 @@ def split_docs_to_chunks(documents: dict, file_types: List[str], chunk_size=2000
 
     return all_chunks
 
+
 chunks_res = split_docs_to_chunks(DOCS, ['txt', 'json', 'docx'])
 
 
@@ -277,28 +314,40 @@ def get_chroma_vectorstore(documents, embeddings, persist_directory):
     if os.path.isdir(persist_directory) and os.listdir(persist_directory):
         print("Loading existing Chroma vectorstore...")
         vectorstore = Chroma(
-            #collection_name=current_user,
-            embedding_function=embeddings, persist_directory=persist_directory)
+            embedding_function=embeddings, persist_directory=persist_directory
+        )
 
-        uniq_sources_to_add = set([doc.metadata['source'].split('\\')[-1] for doc in chunks_res])
-        if len(uniq_sources_to_add) > 0:
-            vectorstore.add_documents(documents=chunks_res, embedding=embeddings)
-            tmp = [add_filename_to_metadata('local', filename) for filename in uniq_sources_to_add]
+        existing_files = get_uploaded_filenames('local')
+        uniq_sources_to_add = set(
+            doc.metadata['source'] for doc in chunks_res
+            if doc.metadata['source'] not in existing_files
+        )
+
+        if uniq_sources_to_add:
+            vectorstore.add_documents(
+                documents=[doc for doc in chunks_res if doc.metadata['source'] in uniq_sources_to_add],
+                embedding=embeddings
+            )
+            for filename in uniq_sources_to_add:
+                add_filename_to_metadata('local', filename)
         else:
             print('Новых документов не было, пропускаем шаг добавления')
 
     else:
         print("Creating and indexing new Chroma vectorstore...")
-        vectorstore = Chroma.from_documents(documents=documents,
-                                            #collection_name=current_user,
-                                            embedding=embeddings, persist_directory=persist_directory)
+        vectorstore = Chroma.from_documents(
+            documents=documents,
+            embedding=embeddings, persist_directory=persist_directory
+        )
+        uniq_sources_to_add = set(doc.metadata['source'] for doc in documents)
+        for filename in uniq_sources_to_add:
+            add_filename_to_metadata('local', filename)
+
     return vectorstore
 
 
 vectorstore = get_chroma_vectorstore(documents=chunks_res, embeddings=embeddings, persist_directory=CHROMA_PATH)
 retriever = vectorstore.as_retriever(search_kwargs={"k": 2}, search_type='similarity')
-
-
 
 
 def format_docs(docs):
@@ -312,9 +361,11 @@ prompt_new = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            '''You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.
-            You can also use information from chat_history if necessary.
-            If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
+            '''You are an assistant for question-answering tasks. Your aim is to help to new employees with job-specific questions.
+            You should help them with propper actions, recomendations abouts software using the following pieces of retrieved context.
+            You can also use information from chat_history to better understand the problem if necessary.
+            If you don't know the answer, just say that you don't know. 
+            If you meet links to the images in your context always display them in your response.
             The context which you should use: {context}
             ''',
         ),
@@ -327,7 +378,7 @@ chain_new = prompt_new | llm
 
 chain_with_message_history = RunnableWithMessageHistory(
     chain_new,
-    lambda session_id: chat_history_for_chain.messages(limit=10),
+    lambda session_id: chat_history_for_chain.messages(limit=15),
     input_messages_key="question",
     history_messages_key="chat_history",
 )
@@ -355,4 +406,4 @@ async def ask_question(question_data: dict = None):
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8123, reload=True)
+    uvicorn.run('app:app', host="0.0.0.0", port=8222)
