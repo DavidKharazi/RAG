@@ -21,7 +21,7 @@ from docx import Document as DocxDocument
 from io import BytesIO
 
 
-os.environ['OPENAI_API_KEY'] = 'sk-proj-mZnhZNHSmYaju7r6sdQhT3BlbkFJmBn9FA8ccqWTgZiC7J45'
+os.environ['OPENAI_API_KEY'] = 'my_api_key'
 
 
 
