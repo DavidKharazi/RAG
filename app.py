@@ -8,12 +8,12 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 import uvicorn
 import boto3
 from fnmatch import fnmatchcase
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 import docx
 import os
 from docx.oxml.ns import qn
@@ -21,7 +21,8 @@ from docx import Document as DocxDocument
 from io import BytesIO
 
 
-os.environ['OPENAI_API_KEY'] = 'my-api-key'
+os.environ['OPENAI_API_KEY'] = 'sk-proj-mZnhZNHSmYaju7r6sdQhT3BlbkFJmBn9FA8ccqWTgZiC7J45'
+
 
 
 model_name = "gpt-4o"
@@ -36,8 +37,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='my-aws-access-key',
-    aws_secret_access_key='my-aws-secret',
+    aws_access_key_id='YCAJEt7ilkMDiPuuZA--Sgb1H',
+    aws_secret_access_key='YCOJE46MLMRlPll_kl6oIllqvT7P7S65E4QohXLZ',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/'
@@ -361,12 +362,19 @@ prompt_new = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            '''You are an assistant for question-answering tasks. Your aim is to help to new employees with job-specific questions.
+            '''
+            Context: 
+                {context}
+            You are an assistant for question-answering tasks. Your aim is to help to new employees with job-specific questions.
             You should help them with propper actions, recomendations abouts software using the following pieces of retrieved context.
             You can also use information from chat_history to better understand the problem if necessary.
-            If you don't know the answer, just say that you don't know. 
+            Use only {context} for consultation. Do not search for information on the Internet
+            First understand the meaning of the user's question, and then look for information in {context}.
+            If you don't find the answer in the {context}, just say 'I don't know', e.g.:
+            Answer the question based only on the context above. If the answer is not in the context, say "I don't know".
             If you meet links to the images in your context always display them in your response.
             The context which you should use: {context}
+            Question: {question}
             ''',
         ),
         MessagesPlaceholder(variable_name="chat_history"),
@@ -385,25 +393,38 @@ chain_with_message_history = RunnableWithMessageHistory(
 
 app = FastAPI()
 
+@app.websocket("/ws/rag_chat/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_json()
+            question_data = data.get('question_data')
+            if question_data is None:
+                await websocket.send_json({"error": "Question data is required"})
+                continue
 
-@app.post("/rag_chat/")
-async def ask_question(question_data: dict = None):
-    if question_data is None:
-        raise HTTPException(status_code=400, detail="Question data is required")
+            question = question_data.get('question')
+            if question is None:
+                await websocket.send_json({"error": "Question is required"})
+                continue
 
-    question = question_data.get('question', None)
-    if question is None:
-        raise HTTPException(status_code=400, detail="Question is required")
+            try:
+                answer = chain_with_message_history.invoke(
+                    {"question": question, "context": format_docs(retriever.invoke(question))},
+                    {"configurable": {"session_id": 1}}
+                ).content
+            except Exception as e:
+                await websocket.send_json({"error": str(e)})
+                continue
 
-    answer = chain_with_message_history.invoke({"question": question, "context": format_docs(retriever.invoke(question))},
-                                               {"configurable": {"session_id": 1}})
-    answer = answer.content
-    if answer is not None:
-        chat_history_for_chain.add_message(HumanMessage(content=question))
-        chat_history_for_chain.add_message(AIMessage(content=answer))
+            if answer:
+                chat_history_for_chain.add_message(HumanMessage(content=question))
+                chat_history_for_chain.add_message(AIMessage(content=answer))
 
-    return {"answer": answer}
-
+            await websocket.send_json({"answer": answer})
+    except WebSocketDisconnect:
+        print("Client disconnected")
 
 if __name__ == "__main__":
-    uvicorn.run('app:app', host="0.0.0.0", port=8222)
+    uvicorn.run('app1:app', host="0.0.0.0", port=8222)
