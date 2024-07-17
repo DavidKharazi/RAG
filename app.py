@@ -427,4 +427,4 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Client disconnected")
 
 if __name__ == "__main__":
-    uvicorn.run('app1:app', host="0.0.0.0", port=8222)
+    uvicorn.run('app:app', host="0.0.0.0", port=8222)
