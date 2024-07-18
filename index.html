@@ -1,0 +1,244 @@
+
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Чат</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        h1 {
+            color: #444;
+        }
+        #chat {
+            height: 400px;
+            border: 1px solid #ddd;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #message {
+            width: calc(100% - 110px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+            box-sizing: border-box;
+        }
+        #send {
+            width: 90px;
+            padding: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #send:hover {
+            background-color: #0056b3;
+        }
+        .message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .message .avatar {
+            width: 40px;
+            height: 40px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .message .content {
+            display: flex;
+            flex-direction: column;
+            max-width: 70%;
+        }
+        .message .text {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+        }
+        .message.self .avatar {
+            background-color: #28a745;
+        }
+        .message.self .text {
+            background-color: #e9f5e9;
+            color: #333;
+        }
+        .item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .item-title {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Чат</h1>
+    <div id="chat"></div>
+    <input type="text" id="message" placeholder="Введите сообщение">
+    <button id="send">Отправить</button>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const sendButton = document.getElementById('send');
+
+        // Создаем WebSocket соединение
+        const socket = new WebSocket(`ws://localhost:8222/ws/rag_chat/`);
+
+        socket.onopen = function(e) {
+            addMessage('Система', 'Соединение установлено');
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+                addMessage('Система', `Ошибка: ${data.error}`);
+            } else if (data.answer) {
+                addStructuredMessage('Бот', data.answer);
+            }
+        };
+
+        socket.onclose = function(event) {
+            if (event.wasClean) {
+                addMessage('Система', `Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
+            } else {
+                addMessage('Система', 'Соединение прервано');
+            }
+        };
+
+        socket.onerror = function(error) {
+            addMessage('Система', `Ошибка: ${error.message}`);
+        };
+
+        sendButton.onclick = function() {
+            sendMessage();
+        };
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message) {
+                const data = { question_data: { question: message } };
+                socket.send(JSON.stringify(data));
+                addMessage('Вы', message, true);
+                messageInput.value = '';
+            }
+        }
+
+        function addMessage(from, message, isSelf = false) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            if (isSelf) messageElement.classList.add('self');
+
+            const avatar = document.createElement('div');
+            avatar.classList.add('avatar');
+            avatar.textContent = from.charAt(0).toUpperCase();
+
+            const content = document.createElement('div');
+            content.classList.add('content');
+
+            const text = document.createElement('div');
+            text.classList.add('text');
+            text.innerHTML = formatMessage(`${from}: ${message}`);
+
+            const timestamp = document.createElement('div');
+            timestamp.classList.add('timestamp');
+            const now = new Date();
+            timestamp.textContent = now.toLocaleTimeString();
+
+            content.appendChild(text);
+            content.appendChild(timestamp);
+
+            messageElement.appendChild(avatar);
+            messageElement.appendChild(content);
+
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function addStructuredMessage(from, message, isSelf = false) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            if (isSelf) messageElement.classList.add('self');
+
+            const avatar = document.createElement('div');
+            avatar.classList.add('avatar');
+            avatar.textContent = from.charAt(0).toUpperCase();
+
+            const content = document.createElement('div');
+            content.classList.add('content');
+
+            const now = new Date();
+            const timestamp = document.createElement('div');
+            timestamp.classList.add('timestamp');
+            timestamp.textContent = now.toLocaleTimeString();
+
+            // Parse and format the message
+            const items = message.split('\n\n').map(item => {
+                const div = document.createElement('div');
+                div.classList.add('item');
+                div.innerHTML = formatMessage(item.replace(/\n/g, '<br>'));
+                return div;
+            });
+
+            items.forEach(item => content.appendChild(item));
+            content.appendChild(timestamp);
+
+            messageElement.appendChild(avatar);
+            messageElement.appendChild(content);
+
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function formatMessage(message) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return message.replace(urlRegex, function(url) {
+                if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
+                    return `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>`;
+                } else {
+                    return `<a href="${url}" target="_blank">${url}</a>`;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

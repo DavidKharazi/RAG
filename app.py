@@ -21,14 +21,18 @@ from docx import Document as DocxDocument
 from io import BytesIO
 
 
-os.environ['OPENAI_API_KEY'] = 'sk-proj-mZnhZNHSmYaju7r6sdQhT3BlbkFJmBn9FA8ccqWTgZiC7J45'
+# os.environ['OPENAI_API_KEY'] = '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'
+
+os.environ['OPENAI_API_KEY'] = 'sk-or-vv-4fd1b5093c0c0441ac93ede59ee8ef136400a20e71e4ca65dec345ba468ce8ce'
+BASE_URL = "https://api.vsegpt.ru/v1"
 
 
 
-model_name = "gpt-4o"
+
+model_name = "gpt-3.5-turbo"
 temperature = 0
-llm = ChatOpenAI(model=model_name, temperature=temperature)
-embeddings = OpenAIEmbeddings()
+llm = ChatOpenAI(model=model_name, base_url=BASE_URL, temperature=temperature)
+embeddings = OpenAIEmbeddings(base_url=BASE_URL)
 
 current_user = 'A100'
 
@@ -371,7 +375,7 @@ prompt_new = ChatPromptTemplate.from_messages(
             Use only {context} for consultation. Do not search for information on the Internet
             First understand the meaning of the user's question, and then look for information in {context}.
             If you don't find the answer in the {context}, just say 'I don't know', e.g.:
-            Answer the question based only on the context above. If the answer is not in the context, say "I don't know".
+            Answer the question based only on the context above. If the answer is not in the context, say "Из представленного контекста ответа нет".
             If you meet links to the images in your context always display them in your response.
             The context which you should use: {context}
             Question: {question}
@@ -427,4 +431,4 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Client disconnected")
 
 if __name__ == "__main__":
-    uvicorn.run('app1:app', host="0.0.0.0", port=8222)
+    uvicorn.run('app:app', host="0.0.0.0", port=8222)
