@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -102,10 +100,39 @@
             font-weight: bold;
             color: #007bff;
         }
+        .typing {
+            display: flex;
+            align-items: center;
+            font-style: italic;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        .typing .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #888;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: blink 1s infinite alternate;
+        }
+        .typing .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes blink {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>WebSocket Чат</h1>
+    <h1>Чат А100</h1>
     <div id="chat"></div>
     <input type="text" id="message" placeholder="Введите сообщение">
     <button id="send">Отправить</button>
@@ -118,8 +145,10 @@
         // Создаем WebSocket соединение
         const socket = new WebSocket(`ws://localhost:8222/ws/rag_chat/`);
 
+        let typingIndicator;
+
         socket.onopen = function(e) {
-            addMessage('Система', 'Соединение установлено');
+            addMessage('Система', 'Вас приветсвует А100! Напишите Ваш вопрос о документообороте.');
         };
 
         socket.onmessage = function(event) {
@@ -127,6 +156,7 @@
             if (data.error) {
                 addMessage('Система', `Ошибка: ${data.error}`);
             } else if (data.answer) {
+                removeTypingIndicator();
                 addStructuredMessage('Бот', data.answer);
             }
         };
@@ -160,6 +190,7 @@
                 socket.send(JSON.stringify(data));
                 addMessage('Вы', message, true);
                 messageInput.value = '';
+                addTypingIndicator();
             }
         }
 
@@ -229,16 +260,69 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        function formatMessage(message) {
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            return message.replace(urlRegex, function(url) {
-                if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
-                    return `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>`;
-                } else {
-                    return `<a href="${url}" target="_blank">${url}</a>`;
-                }
-            });
+        function addTypingIndicator() {
+            if (!typingIndicator) {
+                typingIndicator = document.createElement('div');
+                typingIndicator.classList.add('typing');
+                typingIndicator.innerHTML = 'Бот<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+                chat.appendChild(typingIndicator);
+                chat.scrollTop = chat.scrollHeight;
+            }
         }
+
+        function removeTypingIndicator() {
+            if (typingIndicator) {
+                chat.removeChild(typingIndicator);
+                typingIndicator = null;
+            }
+        }
+
+
+
+        function formatMessage(message) {
+            // Регулярные выражения для поиска ссылок на изображения
+            const markdownImageRegex = /!\[.*?\]\((https:\/\/[^\s]+\.png)\)/g;
+            const plainUrlRegex = /(https:\/\/[^\s]+\.png)/g;
+
+            // Множество для хранения уникальных URL
+            const uniqueUrls = new Set();
+
+            // Переменная для хранения текста сообщения
+            let formattedMessage = message;
+
+            // Найти все ссылки на изображения в формате Markdown и добавить их в множество
+            formattedMessage = formattedMessage.replace(markdownImageRegex, (match, url) => {
+                uniqueUrls.add(url);
+                return `IMAGE_PLACEHOLDER_${url}`;
+            });
+
+            // Найти все простые URL-адреса изображений и добавить их в множество
+            formattedMessage = formattedMessage.replace(plainUrlRegex, (url) => {
+                uniqueUrls.add(url);
+                return `IMAGE_PLACEHOLDER_${url}`;
+            });
+
+            // Создать HTML-код для всех уникальных изображений
+            let imagesHtml = '';
+            uniqueUrls.forEach(url => {
+                imagesHtml += `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>\n`;
+            });
+
+            // Заменить плейсхолдеры на соответствующие изображения
+            formattedMessage = formattedMessage.replace(/IMAGE_PLACEHOLDER_(https:\/\/[^\s]+\.png)/g, (match, url) => {
+                return `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>`;
+            });
+
+            return formattedMessage;
+        }
+
+
+
+
+
     </script>
 </body>
 </html>
+
+
+

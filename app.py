@@ -20,19 +20,17 @@ from docx.oxml.ns import qn
 from docx import Document as DocxDocument
 from io import BytesIO
 
+from starlette.responses import HTMLResponse
+from starlette.staticfiles import StaticFiles
 
-# os.environ['OPENAI_API_KEY'] = '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'
-
-os.environ['OPENAI_API_KEY'] = 'sk-or-vv-4fd1b5093c0c0441ac93ede59ee8ef136400a20e71e4ca65dec345ba468ce8ce'
-BASE_URL = "https://api.vsegpt.ru/v1"
-
+os.environ['OPENAI_API_KEY'] = 'my_api_key'
 
 
 
-model_name = "gpt-3.5-turbo"
+model_name = "gpt-4o"
 temperature = 0
-llm = ChatOpenAI(model=model_name, base_url=BASE_URL, temperature=temperature)
-embeddings = OpenAIEmbeddings(base_url=BASE_URL)
+llm = ChatOpenAI(model=model_name, temperature=temperature)
+embeddings = OpenAIEmbeddings()
 
 current_user = 'A100'
 
@@ -41,8 +39,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='YCAJEt7ilkMDiPuuZA--Sgb1H',
-    aws_secret_access_key='YCOJE46MLMRlPll_kl6oIllqvT7P7S65E4QohXLZ',
+    aws_access_key_id='my_aws_access',
+    aws_secret_access_key='my_aws_secret',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/'
@@ -396,6 +394,15 @@ chain_with_message_history = RunnableWithMessageHistory(
 )
 
 app = FastAPI()
+
+
+# Подключение статических файлов
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Маршрут для главной страницы
+@app.get("/")
+async def get():
+    return HTMLResponse(open("static/index.html").read())
 
 @app.websocket("/ws/rag_chat/")
 async def websocket_endpoint(websocket: WebSocket):
