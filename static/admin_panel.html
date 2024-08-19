@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .status-button {
+            padding: 5px 10px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .true {
+            background-color: #28a745;
+        }
+        .false {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>Панель администратора</h1>
+    <table>
+        <tr>
+            <th>Email</th>
+            <th>Активен</th>
+            <th>Изменить статус</th>
+        </tr>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.email }}</td>
+            <td>{{ user.is_active }}</td>
+            <td>
+                <form method="post" action="/admin/change-status">
+                    <input type="hidden" name="email" value="{{ user.email }}">
+                    <input type="hidden" name="current_status" value="{{ user.is_active }}">
+                    <button type="submit" class="status-button {{ 'false' if user.is_active else 'true' }}">
+                        {{ 'Deactivate' if user.is_active else 'Activate' }}
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

@@ -1,0 +1,165 @@
+
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #333;
+        }
+        button.google {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .separator {
+            margin: 20px 0;
+            font-size: 18px;
+            color: #888;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button.login {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        button.login:hover {
+            background-color: #0056b3;
+        }
+
+        button.login.error {
+            background-color: #ccc; /* Серый цвет для кнопки с ошибкой */
+            cursor: not-allowed;
+        }
+        .login-link {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #007bff;
+        }
+        .login-link a {
+            text-decoration: none;
+            color: #007bff;
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Авторизация</h1>
+        <form id="loginForm">
+            <input type="text" name="username" id="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit" class="login">Войти</button>
+            <div id="error-message" class="error"></div>
+        </form>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const form = document.getElementById('loginForm');
+                const usernameInput = document.getElementById('username');
+                const passwordInput = document.querySelector('input[name="password"]');
+                const errorMessage = document.getElementById('error-message');
+                const loginButton = document.querySelector('button.login');
+
+                // Функция для обновления состояния кнопки
+                function updateButtonState() {
+                    if (errorMessage.textContent) {
+                        loginButton.classList.add('error'); // Добавляем класс ошибки
+                        loginButton.disabled = true; // Отключаем кнопку
+                    } else {
+                        loginButton.classList.remove('error'); // Убираем класс ошибки
+                        loginButton.disabled = false; // Включаем кнопку
+                    }
+                }
+
+                // Убираем сообщение об ошибке и обновляем состояние кнопки при фокусе на поле ввода username
+                usernameInput.addEventListener('focus', function() {
+                    errorMessage.textContent = '';
+                    updateButtonState();
+                });
+
+                passwordInput.addEventListener('focus', function() {
+                    errorMessage.textContent = '';
+                    updateButtonState();
+                });
+
+                form.addEventListener('submit', async function(event) {
+                    event.preventDefault(); // Останавливаем стандартную отправку формы
+
+                    // Получаем значение поля username
+                    const username = usernameInput.value;
+
+                    // Сохраняем значение в localStorage
+                    localStorage.setItem('username', username);
+                    localStorage.removeItem('currentChatId');
+
+                    // Собираем данные формы
+                    const formData = new FormData(form);
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'error') {
+                        errorMessage.textContent = data.message;
+                        updateButtonState(); // Обновляем состояние кнопки
+                    } else if (data.status === 'success') {
+                        window.location.href = data.redirect;
+                    }
+                });
+            });
+        </script>
+
+        <div class="login-link">
+            Впервые здесь? <a href="/register">Зарегистрироваться</a>
+        </div>
+
+        <div class="login-link">
+            Забыли пароль? <a href="/forgot-password">Сбросить пароль</a>
+        </div>
+    </div>
+</body>
+</html>

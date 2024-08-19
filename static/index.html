@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7,40 +9,90 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f0f2f5;
-            color: #333;
+            background-color: #1e1e2f;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
         }
-        h1 {
-            color: #444;
+        header {
+            background-color: #27293d;
+            padding: 15px 25px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            background-color: #27293d;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            padding: 15px;
+            background-color: #27293d;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
         }
         #chat {
-            height: 400px;
-            border: 1px solid #ddd;
-            overflow-y: scroll;
-            padding: 10px;
-            margin-bottom: 10px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #1e1e2f;
+        }
+        #message-container {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #444;
+            background-color: #27293d;
         }
         #message {
-            width: calc(100% - 110px);
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-right: 10px;
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            margin-right: 15px;
             box-sizing: border-box;
+            background-color: #3a3b4f;
+            color: #eee;
         }
         #send {
-            width: 90px;
-            padding: 10px;
+            padding: 12px 25px;
             border: none;
             background-color: #007bff;
             color: white;
-            border-radius: 4px;
+            border-radius: 25px;
             cursor: pointer;
             transition: background-color 0.3s;
         }
@@ -71,11 +123,12 @@
             max-width: 70%;
         }
         .message .text {
-            background-color: #f1f1f1;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.9em;
-            line-height: 1.4;
+            margin-bottom: 10px;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 20px;
+            background-color: #2b2c3e;
+            color: #eee;
         }
         .message .timestamp {
             font-size: 0.8em;
@@ -86,15 +139,16 @@
             background-color: #28a745;
         }
         .message.self .text {
-            background-color: #e9f5e9;
-            color: #333;
+            background-color: #2b2c3e;
+            color: #eee;
         }
         .item {
             margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 20px;
+            background-color: #2b2c3e;
+            color: #eee;
         }
         .item-title {
             font-weight: bold;
@@ -129,51 +183,475 @@
                 opacity: 1;
             }
         }
+        .chat-item {
+            padding: 15px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-item .chat-title {
+            flex: 1;
+            color: #eee;
+        }
+
+        header button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-left: 10px;
+        }
+        header button:hover {
+            background-color: #0056b3;
+        }
+
+        #logout {
+            padding: 10px 20px;
+            border: none;
+            background-color: #D2691E;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-left: 10px;
+        }
+        #logout:hover {
+            background-color: #8B4513;
+        }
+
+        .sidebar-header button {
+            padding: 8px 15px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .sidebar-header button:hover {
+            background-color: #0056b3;
+        }
+
+        .chat-header button {
+            padding: 8px 15px;
+            border: none;
+            background-color: #d9534f;
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .chat-header button:hover {
+            background-color: #c9302c;
+        }
+
+        .select-chat, .delete-chat {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-left: 10px;
+        }
+
+        .select-chat {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .select-chat:hover {
+            background-color: #0056b3;
+        }
+
+        .delete-chat {
+            background-color: #d9534f;
+            color: white;
+        }
+
+        .delete-chat:hover {
+            background-color: #c9302c;
+        }
+
+        .logo {
+        font-family: 'Mukta', sans-serif;
+        font-size: 48px;
+        letter-spacing: 1px;
+        word-spacing: 3px;
+        color: #FFFFFF;
+        font-weight: bold;
+        text-decoration: none;
+        font-style: italic;
+        font-variant: normal;
+        text-transform: none;
+        }
+
+
+        .chat-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #800000;
+            border-radius: 4px;
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
+        .chat-item.active {
+            background-color: #2F4F4F; /* Цвет фона для активного чата */
+            border: 1px solid #007bff; /* Цвет границы для активного чата */
+            transition: background-color 0.3s ease;
+        }
+        .chat-item.highlight {
+            background-color: #b2ebf2; /* Временная подсветка для анимации */
+            position: relative;
+            z-index: 1;
+            animation: highlight 0.5s forwards;
+        }
+        @keyframes highlight {
+            0% {
+                background-color: #b2ebf2;
+                transform: scaleY(0);
+            }
+            100% {
+                background-color: #e0f7fa;
+                transform: scaleY(1);
+            }
+        }
+
+
+        #username-display {
+            margin-left: 10px;
+            font-size: 16px;
+            color: white;
+        }
+
+        /*Для мобильной версии*/
+        @media (max-width: 768px) {
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 20px;
+                background-color: #333; /* Темный фон для верхней панели */
+                color: #fff;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+
+            header .logo {
+                font-size: 20px;
+                font-weight: bold;
+                color: #fff; /* Белый цвет текста для логотипа */
+            }
+
+            header #username-display {
+                font-size: 14px;
+                color: #fff; /* Белый цвет для username */
+                margin-left: auto;
+            }
+
+            header div {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            #new-chat, #logout {
+                font-size: 12px;
+                padding: 5px 10px;
+                margin: 0 5px;
+                background-color: #444; /* Темный фон для кнопок */
+                color: #fff; /* Белый цвет текста кнопок */
+                border: none;
+                border-radius: 4px;
+            }
+
+            .container {
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                height: 100vh;
+                padding: 0;
+                overflow-y: auto; /* Общая прокрутка для контейнера */
+            }
+
+            .chat {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 10px;
+                overflow-y: auto; /* Прокрутка внутри чата */
+                background-color: #2b2c3e;
+            }
+
+            .sidebar {
+                order: 1;
+                width: 100%;
+                padding: 10px;
+                border-top: 1px solid #2b2c3e;
+                background-color: #2b2c3e; /* Белый фон для нижней панели */
+            }
+
+            .sidebar-header {
+                display: none; /* Убираем заголовок на мобильной версии */
+            }
+
+            .sidebar-content {
+                max-height: 80px; /* Ограничиваем высоту содержимого для чатов */
+                /*overflow-y: hidden; !* Скрываем прокрутку в панели чатов *!*/
+                white-space: nowrap;
+                overflow-x: auto; /* Горизонтальная прокрутка чатов */
+                overflow-y: auto;
+            }
+
+            #message-container {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px;
+                border-top: 1px solid #ddd;
+                background-color: #2b2c3e; /* Белый фон для нижней панели */
+            }
+
+            input[type="text"] {
+                width: calc(100% - 60px);
+                font-size: 14px;
+                padding: 8px;
+            }
+
+             button#send {
+                width: 50px;
+                font-size: 14px;
+                padding: 8px;
+                background-color: #007bff;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                /* Новый текст для кнопки отправки на мобильных устройствах */
+                content: "Send";
+            }
+
+        }
+
     </style>
 </head>
 <body>
-    <h1>Чат А100</h1>
-    <div id="chat"></div>
-    <input type="text" id="message" placeholder="Введите сообщение">
-    <button id="send">Отправить</button>
+    <header>
+        <div class="logo">Utlik.</div>
+        <div>
+            <span id="username-display"></span>
+            <button id="new-chat">Новый чат</button>
+            <button id="logout">Выход</button>
+        </div>
+    </header>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div>Ваш консультант A100:</div>
+<!--                <button id="hide-sidebar">Скрыть панель</button>-->
+            </div>
+            <div class="sidebar-content" id="chat-list">
+                <!-- Список чатов будет загружаться здесь -->
+            </div>
+        </div>
+        <div class="chat">
+            <div class="chat-header">
+                <div id="chat-title">Выберите чат</div>
+<!--                <button id="delete-chat">Удалить чат</button>-->
+            </div>
+            <div id="chat"></div>
+            <div id="message-container">
+                <input type="text" id="message" placeholder="Введите сообщение">
+                <button id="send">Отправить</button>
+            </div>
+        </div>
+    </div>
 
-    <script>
+
+     <script>
         const chat = document.getElementById('chat');
         const messageInput = document.getElementById('message');
         const sendButton = document.getElementById('send');
-
-        // Создаем WebSocket соединение
-        const socket = new WebSocket(`ws://localhost:8222/ws/rag_chat/`);
-
+        const newChatButton = document.getElementById('new-chat');
+        const chatList = document.getElementById('chat-list');
+        const chatTitle = document.getElementById('chat-title');
+        const deleteChatButton = document.getElementById('delete-chat');
+        let currentChatId = null;
         let typingIndicator;
+        let socket;
+        const logoutButton = document.getElementById('logout');
 
-        socket.onopen = function(e) {
-            addMessage('Система', 'Вас приветсвует А100! Напишите Ваш вопрос о документообороте.');
-        };
+        if (window.innerWidth <= 768) {
+                document.getElementById('send').textContent = 'Send';
+            }
 
-        socket.onmessage = function(event) {
+        async function initialize() {
+            const username = localStorage.getItem('username');
+            if (username) {
+                initializeWebSocket(username);
+                await loadUserChats(username);
+
+                const savedChatId = localStorage.getItem('currentChatId');
+                if (savedChatId && document.querySelector(`[data-chat-id="${savedChatId}"]`)) {
+                    await switchChat(savedChatId);
+                } else {
+                    await selectNewActiveChat();
+                }
+            }
+
+            else {window.location.href = '/register';}
+        }
+
+
+
+        function initializeWebSocket(username) {
+            socket = new WebSocket(`ws://localhost:8222/ws/rag_chat/?email=${(username)}`);
+            // socket = new WebSocket(`wss://chata100.up.railway.app/ws/rag_chat/?email=${(username)}`);
+
+            socket.onopen = function(chatName) {
+                if (currentChatId === null) {
+
+            }
+            };
+
+
+
+            function handleUserChange(newUsername) {
+            // Сброс currentChatId при смене пользователя
+            currentChatId = null;
+            localStorage.removeItem('currentChatId');
+
+            // Перезагрузить WebSocket с новым пользователем
+            initializeWebSocket(newUsername);
+        }
+
+
+
+            socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             if (data.error) {
-                addMessage('Система', `Ошибка: ${data.error}`);
+                // addMessage('Система', `Ошибка: ${data.error}`);
+            } else if (data.messages) {
+                // Приняты сообщения
+                if (currentChatId) {
+                    data.messages.forEach(msg => {
+                        if (msg.session_id === currentChatId) {
+                            addStructuredMessage(msg.sender, msg.messages, msg.sent_at);
+                        }
+                    });
+                }
             } else if (data.answer) {
                 removeTypingIndicator();
-                addStructuredMessage('Бот', data.answer);
+                addStructuredMessage('Киберсотрудник', data.answer);
             }
         };
 
-        socket.onclose = function(event) {
-            if (event.wasClean) {
-                addMessage('Система', `Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
-            } else {
-                addMessage('Система', 'Соединение прервано');
+
+
+            socket.onclose = function(event) {
+                if (event.wasClean) {
+                    addMessage('Система', `Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
+                } else {
+                    addMessage('Система:', 'Соединение прервано');
+                }
+            };
+
+            socket.onerror = function(error) {
+                addMessage('Система', `Ошибка: ${error.message}`);
+            };
+        }
+
+        let isWelcomeMessageSent = false;
+
+        logoutButton.onclick = () => {
+            window.location.href = "/login";
+        };
+
+        // Функция для отображения username
+        function displayUsername() {
+            const username = localStorage.getItem('username'); // Извлекаем username из localStorage
+            const usernameDisplay = document.getElementById('username-display');
+
+            if (username && usernameDisplay) {
+                usernameDisplay.textContent = username; // Отображаем username
             }
-        };
+        }
 
-        socket.onerror = function(error) {
-            addMessage('Система', `Ошибка: ${error.message}`);
-        };
+        // Вызываем функцию при загрузке страницы
+        window.onload = displayUsername;
 
-        sendButton.onclick = function() {
+
+
+        async function loadUserChats(email) {
+            try {
+                const response = await fetch(`/get_user_chats/${email}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load user chats');
+                }
+
+                const data = await response.json();
+                const chats = data.chats;
+
+                chatList.innerHTML = ''; // Очистка существующих чатов
+                chats.forEach(chat => {
+                    addChatToPanel(chat.id, chat.cyberman_id);
+                });
+
+                // Подсвечиваем активный чат после загрузки списка
+                const savedChatId = localStorage.getItem('currentChatId');
+                if (savedChatId) {
+                    const activeChatElement = document.querySelector(`[data-chat-id="${savedChatId}"]`);
+                    if (activeChatElement) {
+                        activeChatElement.classList.add('active');
+                    }
+                }
+
+                return chats;
+            } catch (error) {
+                console.error('Error loading user chats:', error);
+                return [];
+            }
+        }
+
+
+
+
+        const names = [
+          'Алексей', 'Анастасия', 'Андрей', 'Анна', 'Антон', 'Арина', 'Артем', 'Вадим', 'Валентин', 'Валерия',
+          'Василий', 'Вера', 'Виктор', 'Виктория', 'Владимир', 'Галина', 'Георгий', 'Дарья', 'Денис', 'Дмитрий',
+          'Евгений', 'Евгения', 'Катя', 'Елена', 'Иван', 'Игорь', 'Илья', 'Ирина', 'Кирилл', 'Валя',
+          'Ксения', 'Любовь', 'Максим', 'Марина', 'Мария', 'Михаил', 'Надежда', 'Наталья', 'Никита', 'Николай',
+          'Олег', 'Ольга', 'Павел', 'Полина', 'Роман', 'Светлана', 'Сергей', 'Татьяна', 'Юлия', 'Юрий'
+        ];
+
+        function getNameForChatId(chatId) {
+          // Преобразуем chatId в число и используем остаток от деления на длину массива имен
+          const index = Math.abs(parseInt(chatId, 10)) % names.length;
+          return names[index];
+        }
+
+        function addChatToPanel(chatId, cybermanId) {
+          const chatElement = document.createElement('div');
+          chatElement.classList.add('chat-item');
+          chatElement.dataset.chatId = chatId;
+
+          const chatName = getNameForChatId(chatId);
+
+          chatElement.innerHTML = `
+            <div class="chat-title">${chatName}</div>
+            <button class="select-chat">Выбрать</button>
+            <button class="delete-chat">Удалить</button>
+          `;
+
+          chatElement.querySelector('.select-chat').onclick = () => switchChat(chatId);
+          chatElement.querySelector('.delete-chat').onclick = () => deleteChat(chatId);
+
+          chatList.appendChild(chatElement);
+        }
+
+
+                sendButton.onclick = function() {
             sendMessage();
         };
 
@@ -183,16 +661,6 @@
             }
         });
 
-        function sendMessage() {
-            const message = messageInput.value;
-            if (message) {
-                const data = { question_data: { question: message } };
-                socket.send(JSON.stringify(data));
-                addMessage('Вы', message, true);
-                messageInput.value = '';
-                addTypingIndicator();
-            }
-        }
 
         function addMessage(from, message, isSelf = false) {
             const messageElement = document.createElement('div');
@@ -200,15 +668,16 @@
             if (isSelf) messageElement.classList.add('self');
 
             const avatar = document.createElement('div');
+            const username = localStorage.getItem('username');
             avatar.classList.add('avatar');
-            avatar.textContent = from.charAt(0).toUpperCase();
+            avatar.textContent = username.charAt(0).toUpperCase();
 
             const content = document.createElement('div');
             content.classList.add('content');
 
             const text = document.createElement('div');
             text.classList.add('text');
-            text.innerHTML = formatMessage(`${from}: ${message}`);
+            text.innerHTML = formatMessage(`${from} ${message}`);
 
             const timestamp = document.createElement('div');
             timestamp.classList.add('timestamp');
@@ -225,24 +694,42 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        function addStructuredMessage(from, message, isSelf = false) {
+
+
+        function addStructuredMessage(from, message, sentAt = new Date().toISOString(), isSelf = false) {
+            const username = localStorage.getItem('username') || 'Пользователь';
+
+            // Определяем отображаемое имя отправителя
+            let displayFrom;
+            let isUserMessage = false;
+
+            if (from === 'human') {
+                displayFrom = username;
+                isUserMessage = true;
+            } else if (from === 'ai') {
+                displayFrom = 'Киберсотрудник';
+            } else {
+                displayFrom = from;
+            }
+
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
-            if (isSelf) messageElement.classList.add('self');
+            if (isSelf || isUserMessage) messageElement.classList.add('self');
 
             const avatar = document.createElement('div');
             avatar.classList.add('avatar');
-            avatar.textContent = from.charAt(0).toUpperCase();
+            avatar.textContent = displayFrom.charAt(0).toUpperCase();
+            if (isSelf || isUserMessage) avatar.style.backgroundColor = '#28a745'; // Зелёный аватар для пользователя
+            else avatar.style.backgroundColor = '#007bff'; // Синий аватар для остальных
 
             const content = document.createElement('div');
             content.classList.add('content');
 
-            const now = new Date();
+            const now = new Date(sentAt);
             const timestamp = document.createElement('div');
             timestamp.classList.add('timestamp');
             timestamp.textContent = now.toLocaleTimeString();
 
-            // Parse and format the message
             const items = message.split('\n\n').map(item => {
                 const div = document.createElement('div');
                 div.classList.add('item');
@@ -260,11 +747,38 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
+
+
+        async function loadChatMessages(chatId) {
+            console.log(`Loading messages for chat ID: ${chatId}`);
+            try {
+                const response = await fetch(`/get_chat_messages/${chatId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load chat messages');
+                }
+
+                const data = await response.json();
+                const messages = data.messages;
+
+                // Очищаем текущие сообщения перед добавлением новых
+                chat.innerHTML = '';
+
+                messages.forEach(message => {
+                    addStructuredMessage(message.sender, message.messages, message.sent_at);
+                });
+            } catch (error) {
+                console.error('Error loading chat messages:', error);
+            }
+        }
+
+
+
+
         function addTypingIndicator() {
             if (!typingIndicator) {
                 typingIndicator = document.createElement('div');
                 typingIndicator.classList.add('typing');
-                typingIndicator.innerHTML = 'Бот<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+                typingIndicator.innerHTML = 'Киберсотрудник<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
                 chat.appendChild(typingIndicator);
                 chat.scrollTop = chat.scrollHeight;
             }
@@ -277,52 +791,191 @@
             }
         }
 
-
-
         function formatMessage(message) {
-            // Регулярные выражения для поиска ссылок на изображения
-            const markdownImageRegex = /!\[.*?\]\((https:\/\/[^\s]+\.png)\)/g;
-            const plainUrlRegex = /(https:\/\/[^\s]+\.png)/g;
+            const urlRegex = /(https:\/\/[^\s]+\.png)/gi;
+            const imageInfoText = "Для более подробной информации вы можете ознакомиться с изображениями:";
+            let uniqueUrls = new Set();
 
-            // Множество для хранения уникальных URL
-            const uniqueUrls = new Set();
+            // Извлекаем все URL-адреса изображений
+            let match;
+            while ((match = urlRegex.exec(message)) !== null) {
+                const url = extractValidUrl(match[0]);
+                if (url) {
+                    uniqueUrls.add(url);
+                }
+            }
 
-            // Переменная для хранения текста сообщения
-            let formattedMessage = message;
+            // Если в сообщении есть изображения
+            if (uniqueUrls.size > 0) {
+                let imagesHtml = '';
+                uniqueUrls.forEach(url => {
+                    imagesHtml += `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>\n`;
+                });
 
-            // Найти все ссылки на изображения в формате Markdown и добавить их в множество
-            formattedMessage = formattedMessage.replace(markdownImageRegex, (match, url) => {
-                uniqueUrls.add(url);
-                return `IMAGE_PLACEHOLDER_${url}`;
+                // Формируем итоговое сообщение
+                return `${imageInfoText}<div style="margin-bottom: 20px;"></div>${imagesHtml}`;
+            }
+
+            // Если изображений нет, возвращаем оригинальное сообщение
+            return message.trim();
+        }
+
+        function extractValidUrl(text) {
+            const validUrlRegex = /^https:\/\/.*\.png$/i;
+            const match = text.match(validUrlRegex);
+            return match ? match[0] : null;
+        }
+
+
+
+
+        document.getElementById('new-chat').onclick = async function() {
+            const username = localStorage.getItem('username');
+            if (!username) {
+                console.error('Username not found in localStorage');
+                return;
+            }
+
+            const response = await fetch('/create_new_chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email: username })
             });
 
-            // Найти все простые URL-адреса изображений и добавить их в множество
-            formattedMessage = formattedMessage.replace(plainUrlRegex, (url) => {
-                uniqueUrls.add(url);
-                return `IMAGE_PLACEHOLDER_${url}`;
+            if (!response.ok) {
+                console.error('Failed to create new chat', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+            const sessionId = data.session_id;
+            currentChatId = sessionId; // Обновляем текущий chatId
+            addChatToPanel(sessionId, data.cyberman_id);
+            switchChat(sessionId);
+        };
+
+
+
+        async function switchChat(chatId) {
+            console.log(`Switching to chat ID: ${chatId}`);
+            currentChatId = chatId;
+            localStorage.setItem('currentChatId', chatId);
+            const chatName = getNameForChatId(chatId);
+            chatTitle.textContent = `Консультант ${chatName}`;
+            chat.innerHTML = '';
+            await loadChatMessages(chatId);
+
+            // Убираем выделение со всех чатов
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.remove('active');
             });
 
-            // Создать HTML-код для всех уникальных изображений
-            let imagesHtml = '';
-            uniqueUrls.forEach(url => {
-                imagesHtml += `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>\n`;
-            });
-
-            // Заменить плейсхолдеры на соответствующие изображения
-            formattedMessage = formattedMessage.replace(/IMAGE_PLACEHOLDER_(https:\/\/[^\s]+\.png)/g, (match, url) => {
-                return `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>`;
-            });
-
-            return formattedMessage;
+            // Добавляем выделение активному чату
+            const activeChatElement = document.querySelector(`[data-chat-id="${chatId}"]`);
+            if (activeChatElement) {
+                activeChatElement.classList.add('active');
+            }
         }
 
 
 
 
 
+        async function sendMessage() {
+            const message = messageInput.value;
+            const username = localStorage.getItem('username') || 'Вы';
+
+            if (message && socket.readyState === WebSocket.OPEN) {
+                if (!currentChatId) {
+                    // Если currentChatId не установлен, пытаемся получить существующую сессию из базы данных
+                    const response = await fetch(`/get_user_chats/${username}`);
+                    if (!response.ok) {
+                        console.error('Failed to load user chats', response.statusText);
+                        return;
+                    }
+
+                    const data = await response.json();
+                    if (data.chats.length > 0) {
+                        currentChatId = data.chats[0].id; // Берем первый чат из списка, либо можно выбрать по другому критерию
+                        localStorage.setItem('currentChatId', currentChatId);
+                    } else {
+                        console.error('No chats available for user');
+                        return;
+                    }
+                }
+
+                const data = {
+                    question_data: {
+                        question: message,
+                        session_id: currentChatId  // Передаем правильный sessionId
+                    }
+                };
+
+                socket.send(JSON.stringify(data));
+                addMessage('', message, true);
+                messageInput.value = '';
+                addTypingIndicator();
+            }
+        }
+
+
+
+
+        function deleteCurrentChat() {
+            if (currentChatId) {
+                deleteChat(currentChatId);
+            }
+        }
+
+
+        async function deleteChat(chatId) {
+            try {
+                const response = await fetch(`/delete_chat/${chatId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const chatElement = chatList.querySelector(`[data-chat-id="${chatId}"]`);
+                    if (chatElement) {
+                        chatList.removeChild(chatElement);
+                    }
+
+                    if (chatId === currentChatId) {
+                        localStorage.removeItem('currentChatId');
+                        currentChatId = null;
+                    }
+
+                    // Перезагружаем список чатов и выбираем новый активный чат
+                    const username = localStorage.getItem('username');
+                    if (username) {
+                        await loadUserChats(username);
+                        await selectNewActiveChat();
+                    }
+                } else {
+                    console.error('Failed to delete chat', response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to delete chat', error);
+            }
+        }
+
+
+        async function selectNewActiveChat() {
+            const chatItems = chatList.querySelectorAll('.chat-item');
+            if (chatItems.length > 0) {
+                const lastChatId = chatItems[chatItems.length - 1].dataset.chatId;
+                await switchChat(lastChatId);
+            } else {
+                chatTitle.textContent = 'Выберите чат';
+                chat.innerHTML = '';
+            }
+        }
+
+
+
+        initialize();
     </script>
 </body>
 </html>
-
-
-
