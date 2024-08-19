@@ -36,7 +36,7 @@ from email.mime.multipart import MIMEMultipart
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = 'sk-proj-aEsBrDq4EtRTHbOAs7diT3BlbkFJkTSmHfrt4vt8Fc54S6C6'
+os.environ['OPENAI_API_KEY'] = 'my_api_key'
 
 
 model_name = "gpt-4o"
