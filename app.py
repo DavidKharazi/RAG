@@ -1,9 +1,13 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
+from urllib import request
+from langchain.retrievers import SelfQueryRetriever
+from langchain.chains.query_constructor.base import AttributeInfo
+from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings, OpenAI
 import sqlite3
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
@@ -11,6 +15,7 @@ from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import AIMessage, HumanMessage
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Form, Request, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
+from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 from passlib.context import CryptContext
 import uvicorn
@@ -33,10 +38,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = 'sk-proj-aEsBrDq4EtRTHbOAs7diT3BlbkFJkTSmHfrt4vt8Fc54S6C6'
+os.environ['OPENAI_API_KEY'] = 'my_api_key'
+
 
 
 model_name = "gpt-4o"
@@ -57,6 +64,7 @@ s3_client = session.client(
 
 CHROMA_PATH = f'./chroma/{current_user}/'
 
+oauth = OAuth()
 
 
 def init_metadata_db():
@@ -105,6 +113,7 @@ def init_metadata_db():
             ended_at TIMESTAMP,
             user_id INTEGER,
             cyberman_id INTEGER,
+            topic TEXT,
             FOREIGN KEY (user_id) REFERENCES Users(id),
             FOREIGN KEY (cyberman_id) REFERENCES Cyberman(id)
         );
@@ -114,7 +123,7 @@ def init_metadata_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             messages VARCHAR(255),
             sender VARCHAR(255),
-            sent_at TIMESTAMP DEFAULT (datetime('now', 'localtime', '+3 hours')),
+            sent_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
             session_id INTEGER,
             FOREIGN KEY (session_id) REFERENCES Session(id)
         );
@@ -592,7 +601,71 @@ def get_chroma_vectorstore(documents, embeddings, persist_directory):
 
 
 vectorstore = get_chroma_vectorstore(documents=chunks_res, embeddings=embeddings, persist_directory=CHROMA_PATH)
+
 retriever = vectorstore.as_retriever(search_kwargs={"k": 2}, search_type='similarity')
+
+# retriever = vectorstore.as_retriever(
+#     search_type='similarity_score_threshold',
+#     search_kwargs={"k": 3,  "score_threshold": 0.1},
+#     )
+
+
+# retriever = MultiQueryRetriever.from_llm(
+#     retriever=vectorstore.as_retriever(), llm=llm
+# )
+#
+# # Set logging for the queries
+# import logging
+#
+# logging.basicConfig()
+# logging.getLogger("langchain.retrievers.multi_query").setLevel(logging.INFO)
+
+
+
+
+# metadata_field_info = [
+#     AttributeInfo(
+#         name="категория",
+#         description="Категория документа, например, 'ЭЦП', 'документооборот'",
+#         type="string",
+#     ),
+#     AttributeInfo(
+#         name="действие",
+#         description="Тип действия, например, 'отклонение', 'подписание', 'отмена'",
+#         type="string",
+#     ),
+# ]
+#
+# document_content_description = "Инструкции по работе с электронной документацией и ЭЦП"
+#
+# retr = SelfQueryRetriever.from_llm(
+#     llm,
+#     vectorstore,
+#     document_content_description,
+#     metadata_field_info,
+#     verbose=True
+# )
+#
+# ret = vectorstore.as_retriever(search_kwargs={"k": 2}, search_type='similarity')
+#
+#
+# from langchain.retrievers import EnsembleRetriever
+#
+# retriever = EnsembleRetriever(
+#     retrievers=[retr, ret],
+#     weights=[0.5, 0.5]
+# )
+#
+#
+# def post_process_results(results):
+#     keywords = ["ЭЦП", "электронная подпись", "отклонение", "отмена"]
+#     return [r for r in results if any(keyword in r.page_content for keyword in keywords)]
+#
+# raw_results = retriever.get_relevant_documents("Как отклонить ЭЦП")
+# filtered_results = post_process_results(raw_results)
+
+
+
 
 
 def format_docs(docs):
@@ -600,6 +673,8 @@ def format_docs(docs):
 
 
 chat_history_for_chain = SQLiteChatHistory()
+
+
 
 # prompt_sys = '''
 #         Context:
@@ -617,42 +692,46 @@ chat_history_for_chain = SQLiteChatHistory()
 # '''
 
 
+
+# prompt_sys = '''
+#         Context:
+#             {context}
+#         You are an assistant for question-answering tasks, aimed at helping new employees with job-specific questions.
+#         Your goal is to provide proper actions and recommendations regarding software based on the retrieved context.
+#         Strictly use only the information provided in the {context}. Do not search for additional information online, tell jokes, or discuss topics unrelated to the given context. If the information is not in the context, simply state: "Из представленного контекста ответа нет".
+#         Use only the provided {context} for consultation. Do not search for information on the Internet or outside the given context.
+#         First, understand the user's question, and then look for information in the {context}.
+#         If the answer is not directly in the {context}, analyze the context again, looking for semantic similarities with the query. If after this analysis the answer is still not found, respond: "Ответ не найден, пожалуйста уточните ваш вопрос".
+#         If the context includes links to images, display them in your response.
+#         Context: {context}
+#         Question: {question}
+# '''
+
+
 prompt_sys = '''
+Вы - ассистент для ответов на вопросы, предназначенный для помощи новым сотрудникам с вопросами, связанными с работой.
+Ваша цель - предоставлять правильные действия и рекомендации относительно программного обеспечения на основе предоставленного контекста.
+
+ВАЖНО: Вы АБСОЛЮТНО ОГРАНИЧЕНЫ использованием ТОЛЬКО информации, предоставленной в следующем контексте:
+
 Контекст:
-Context: 
-    Вы - ассистент для ответов на вопросы, специализирующийся на помощи новым сотрудникам с вопросами, связанными с их работой. Ваша задача - предоставлять точную информацию, рекомендации по правильным действиям и использованию программного обеспечения, основываясь на следующих источниках:
+{context}
 
-...
+СТРОГИЕ ПРАВИЛА:
+1. Используйте ИСКЛЮЧИТЕЛЬНО информацию из предоставленного контекста. НИКОГДА не обращайтесь к внешним источникам или своим знаниям.
+2. НЕ ВЫДУМЫВАЙТЕ информацию. Если ответа нет в контексте, скажите "Ответ не найден, пожалуйста, уточните ваш вопрос".
+3. НЕ рассказывайте анекдоты, НЕ обсуждайте темы, не связанные с контекстом.
+4. Если в контексте есть ссылки на изображения, отобразите их в вашем ответе.
 
-Инструкции:
-1. Внимательно прочитайте вопрос пользователя и поймите его суть.
-2. Проанализируйте предоставленный контекст {context} и содержимое всех указанных файлов для поиска релевантной информации.
-3. При работе с файлами:
-   a. Убедитесь, что у вас есть доступ к содержимому каждого файла.
-   b. Просматривайте содержимое файлов полностью, не пропуская никакой информации.
-   c. Обратите особое внимание на файлы, связанные с темой вопроса (например, файлы об ЭЦП при вопросах об электронной подписи).
-...
+ПРОЦЕСС ОТВЕТА:
+1. Внимательно прочитайте вопрос пользователя.
+2. Проанализируйте предоставленный контекст на наличие прямого ответа.
+3. Если прямой ответ не найден, повторно проанализируйте контекст, ища семантические сходства с вопросом.
+4. Если ответ все еще не найден, ответьте: "Ответ не найден, пожалуйста, уточните ваш вопрос".
 
-10. Если вопрос касается конкретной процедуры или использования программного обеспечения, предоставьте пошаговые инструкции, основываясь на информации из файлов.
-11. При предоставлении пошаговых инструкций или списков всегда используйте следующий формат:
-
-1. Первый шаг
-   - Подпункт первого шага
-   - Еще один подпункт
-2. Второй шаг
-   - Подпункт второго шага
-3. Третий шаг
-   - Подпункт третьего шага
-
-Продолжайте нумерацию шагов последовательно (4, 5, 6 и т.д.). Никогда не начинайте нумерацию заново. Всегда используйте дефисы (-) для подпунктов.
-
-12. Если информация в разных документах противоречит друг другу, укажите на это и предоставьте информацию из самого актуального документа (если возможно определить).
-13. Если вопрос требует дополнительного уточнения, задайте уточняющие вопросы пользователю.
-14. При ответе на вопросы об ЭЦП обязательно обращайтесь к файлам "15. Приложение 15 Инструкция о получении, продлении ЭЦП.docx" и "Приложение-16-Перечень-владельцев-ЭЦП (2).docx".
-
-Вопрос:
-{question}
+Вопрос: {question}
 '''
+
 
 
 
@@ -665,8 +744,6 @@ prompt_new = ChatPromptTemplate.from_messages(
         ("human", "{question}"),
     ]
 )
-
-
 
 chain_new = prompt_new | llm
 
@@ -715,7 +792,7 @@ def is_email_unique(email: str) -> bool:
 #     # Настройки для отправки почты
 #     sender_email = "datohar82@gmail.com"
 #     receiver_email = email
-#     password = "ufzuyviudqfqebuj"  # Не храните пароли в коде в реальных приложениях
+#     password = "my_password"  # Не храните пароли в коде в реальных приложениях
 #
 #     message = MIMEMultipart("alternative")
 #     message["Subject"] = "Подтверждение регистрации"
@@ -753,27 +830,29 @@ def is_email_unique(email: str) -> bool:
 #         print(f"Ошибка при отправке письма: {e}")
 
 
+
+
 def send_confirmation_email(user_email: str, token: str):
     # Настройки для отправки почты
     sender_email = "datohar82@gmail.com"
-    intermediate_email = "utlik.com@gmail.com"
+    intermediate_email = "datohar@icloud.com"
     password = "my_password"  # Не храните пароли в коде в реальных приложениях
 
-    # Создаем сообщение для промежуточного адреса
-    message = MIMEMultipart("alternative")
-    message["Subject"] = f"Подтверждение регистрации для {user_email}"
-    message["From"] = sender_email
-    message["To"] = intermediate_email
+    # Создаем сообщение для промежуточного адреса (администратора)
+    admin_message = MIMEMultipart("alternative")
+    admin_message["Subject"] = f"Подтверждение регистрации для {user_email}"
+    admin_message["From"] = sender_email
+    admin_message["To"] = intermediate_email
 
-    confirmation_url = f"http://localhost:8222/confirm-email?token={token}"
-    # confirmation_url = f"https://chata100.up.railway.app/confirm-email?token={token}"
+    # confirmation_url = f"http://localhost:8222/confirm-email?token={token}"
+    confirmation_url = f"https://chata100.up.railway.app/confirm-email?token={token}"
 
-    text = f"""
+    admin_text = f"""
     Получена новая регистрация для {user_email}.
     Ссылка подтверждения: {confirmation_url}
     Пожалуйста, перешлите эту ссылку пользователю.
     """
-    html = f"""
+    admin_html = f"""
     <html>
     <body>
         <p>Получена новая регистрация для {user_email}.</p>
@@ -783,19 +862,58 @@ def send_confirmation_email(user_email: str, token: str):
     </html>
     """
 
-    part1 = MIMEText(text, "plain")
-    part2 = MIMEText(html, "html")
+    admin_part1 = MIMEText(admin_text, "plain")
+    admin_part2 = MIMEText(admin_html, "html")
 
-    message.attach(part1)
-    message.attach(part2)
+    admin_message.attach(admin_part1)
+    admin_message.attach(admin_part2)
+
+    # Сообщение для пользователя
+    user_message = MIMEMultipart("alternative")
+    user_message["Subject"] = "Ваша заявка принята"
+    user_message["From"] = sender_email
+    user_message["To"] = user_email
+
+    user_text = f"""
+    Уважаемый пользователь,
+
+    Ваша заявка на регистрацию получена и будет рассмотрена администратором в ближайшее время.
+    Вы получите уведомление после проверки.
+
+    С уважением,
+    Ваша команда поддержки.
+    """
+    user_html = f"""
+    <html>
+    <body>
+        <p>Уважаемый пользователь,</p>
+        <p>Ваша заявка на регистрацию получена и будет рассмотрена администратором в ближайшее время.</p>
+        <p>Вы получите уведомление после проверки.</p>
+        <p>С уважением,<br>Ваша команда поддержки.</p>
+    </body>
+    </html>
+    """
+
+    user_part1 = MIMEText(user_text, "plain")
+    user_part2 = MIMEText(user_html, "html")
+
+    user_message.attach(user_part1)
+    user_message.attach(user_part2)
 
     try:
         # Используем SMTP-сервер Gmail
         server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(sender_email, password)
-        server.sendmail(sender_email, intermediate_email, message.as_string())
-        server.quit()
+
+        # Отправляем письмо администратору
+        server.sendmail(sender_email, intermediate_email, admin_message.as_string())
         print(f"Письмо успешно отправлено на {intermediate_email}")
+
+        # Отправляем письмо пользователю
+        server.sendmail(sender_email, user_email, user_message.as_string())
+        print(f"Письмо успешно отправлено пользователю на {user_email}")
+
+        server.quit()
     except Exception as e:
         print(f"Ошибка при отправке письма: {e}")
 
@@ -949,6 +1067,7 @@ def get_session_by_user_and_cyberman(user_id: int, cyberman_id: int):
 
 @app.post("/create_new_chat/")
 async def create_new_chat(request: Request):
+
     data = await request.json()
     email = data.get('email')
 
@@ -966,6 +1085,70 @@ async def create_new_chat(request: Request):
     db_manager.add_chat_message(session_id, "Вас приветствует А100! Напишите Ваш вопрос о документообороте.", "Система")
 
     return {"session_id": session_id}
+
+
+#Модель для анализа сообщений
+# llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0, base_url=BASE_URL)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+
+analyze_prompt = ChatPromptTemplate.from_messages([
+    ("system", "Проанализируйте следующие сообщения и сформулируйте тему переписки 2 - 3 словах, не больше 23 символов в сумме."),
+    ("human", "{messages}")
+])
+
+
+def analyze_current_chat_topic(user_id, current_session_id):
+    with sqlite3.connect('metadata.db') as conn:
+        cursor = conn.cursor()
+
+        # Получаем все сообщения текущей сессии
+        messages = db_manager.get_chat_messages_by_session_id(current_session_id)
+
+        # Проверяем количество сообщений
+        if len(messages) >= 3:
+            # Извлекаем второе и третье сообщения
+            relevant_messages = messages[1:3]
+
+            # Собираем текст только второго и третьего сообщений
+            messages_text = "\n".join([f"{msg['sender']}: {msg['messages']}" for msg in relevant_messages])
+
+            # Анализируем текст сообщений
+            chain = analyze_prompt | llm
+            topic = chain.invoke({"messages": messages_text}).content
+
+            # Обновляем тему текущей сессии в базе данных
+            cursor.execute("UPDATE Session SET topic = ? WHERE id = ?", (topic, current_session_id))
+            conn.commit()
+
+def update_session_topic(user_id, session_id, new_topic):
+    with sqlite3.connect('metadata.db') as conn:
+        cursor = conn.cursor()
+
+        # Обновляем тему в сессии
+        cursor.execute("UPDATE Session SET topic = ? WHERE id = ? AND user_id = ?",
+                       (new_topic, session_id, user_id))
+        conn.commit()
+
+
+class UpdateTopicRequest(BaseModel):
+    session_id: int
+    new_topic: str
+
+@app.put("/update-topic")
+async def update_topic(request: UpdateTopicRequest):
+    try:
+        with sqlite3.connect('metadata.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE Session SET topic = ? WHERE id = ?",
+                (request.new_topic, request.session_id)
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Session not found or unauthorized")
+            conn.commit()
+        return {"status": "success", "message": "Topic updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/get_chat_messages/{session_id}")
@@ -995,6 +1178,31 @@ async def delete_chat(session_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def get_topic(session_id):
+    try:
+        with sqlite3.connect('metadata.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT topic FROM Session WHERE id = ?", (session_id,))
+            topic = cursor.fetchone()
+        return topic[0] if topic else None
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return None
+
+
+@app.get("/api/chat-topics")
+async def get_chat_topics():
+    conn = sqlite3.connect('metadata.db')
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, topic FROM Session")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return [{"id": row[0], "topic": row[1]} for row in rows]
+
+
 @app.websocket("/ws/rag_chat/")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -1020,15 +1228,17 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     session_id = session[0]
+    topic = get_topic(session_id)
 
     chat_history_for_chain.current_session_id = session_id
 
     messages = db_manager.get_chat_messages_by_session_id(session_id)
-    await websocket.send_json({"messages": messages})
-
+    await websocket.send_json({"messages": messages, "topic": topic})
     try:
         while True:
+
             data = await websocket.receive_json()
+
             question_data = data.get('question_data')
             if question_data is None:
                 await websocket.send_json({"error": "Требуется question_data"})
@@ -1059,9 +1269,20 @@ async def websocket_endpoint(websocket: WebSocket):
             db_manager.add_chat_message(session_id, question, "human")  # Добавляем сообщение пользователя
             db_manager.add_chat_message(session_id, answer, "ai")  # Добавляем ответ бота
 
+            # Получаем количество сообщений в сессии после добавления нового сообщения
+            messages = db_manager.get_chat_messages_by_session_id(session_id)
+            if len(messages) == 3:
+                # Вызываем анализ текущей сессии только после третьего сообщения
+                analyze_current_chat_topic(user_id, session_id)
+                updated_topic = get_topic(session_id)
+                await websocket.send_json({"topic_update": updated_topic})
+
             await websocket.send_json({"answer": answer})
     except WebSocketDisconnect:
         chat_history_for_chain.end_session()
+
+
+
 
 
 def send_reset_email(email: str, token: str):
@@ -1074,8 +1295,8 @@ def send_reset_email(email: str, token: str):
     message["From"] = sender_email
     message["To"] = receiver_email
 
-    reset_url = f"http://localhost:8222/confirm-reset?token={token}&email={email}"
-    # reset_url = f"https://chata100.up.railway.app/confirm-reset?token={token}&email={email}"
+    # reset_url = f"http://localhost:8222/confirm-reset?token={token}&email={email}"
+    reset_url = f"https://chata100.up.railway.app/confirm-reset?token={token}&email={email}"
 
     text = f"Пожалуйста, подтвердите сброс пароля, перейдя по следующей ссылке: {reset_url}"
     html = f"""
@@ -1102,6 +1323,7 @@ def send_reset_email(email: str, token: str):
         print("Письмо успешно отправлено")
     except Exception as e:
         print(f"Ошибка при отправке письма: {e}")
+        return JSONResponse(content={"status": "error", "message": "Пользователь не найден."}, status_code=404)
 
 
 
@@ -1110,21 +1332,29 @@ async def get_forgot_password():
     return FileResponse("static/forgot_link.html")
 
 
+# Сброс пароля
 @app.post("/reset-password-request")
 async def reset_password_request(email: str = Form(...)):
     with sqlite3.connect('metadata.db') as conn:
-        token = get_password_hash(email)
         cursor = conn.cursor()
+
+        # Проверяем, существует ли пользователь с таким email
         cursor.execute("SELECT * FROM Users WHERE email = ?", (email,))
-        cursor.execute("UPDATE Users SET reset_token = ?", (token,))
-        if cursor.rowcount == 0:
-            return JSONResponse(content={"status": "error", "message": "Пользователь не найден."}, status_code=404)
+        user = cursor.fetchone()
+
+        if user is None:
+            return JSONResponse(content={"status": "error", "message": "Пользователь с таким email не найден."},
+                                status_code=404)
+
+        # Если пользователь найден, генерируем токен и обновляем запись
+        token = get_password_hash(email)
+        cursor.execute("UPDATE Users SET reset_token = ? WHERE email = ?", (token, email))
         conn.commit()
 
     send_reset_email(email, token)
     return JSONResponse(content={"status": "success"}, status_code=200)
 
-
+#Обновление пароля
 @app.post("/reset-password")
 async def reset_password(hashed_password: str = Form(...), email: str = Form(...)):
     with sqlite3.connect('metadata.db') as conn:
@@ -1240,6 +1470,8 @@ async def change_status(request: Request, email: str = Form(...), current_status
 async def admin_logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/admin/login")
+
+
 
 
 if __name__ == "__main__":

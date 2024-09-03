@@ -49,7 +49,7 @@
         }
 
         .error {
-            color: #007bff;
+            color: red;
             font-size: 14px;
             margin-top: 10px;
         }
@@ -85,13 +85,17 @@
         </form>
         <script>
 
-            // Находим кнопку
             const submitButton = document.querySelector('button.submit');
 
             // Добавляем обработчик события click
             submitButton.addEventListener('click', function() {
                 // Изменяем цвет кнопки на желтый
                 submitButton.style.backgroundColor = '#F4A460'; // Желтый цвет (gold)
+                submitButton.style.cursor = 'wait'; // Изменяем курсор на указатель загрузки
+
+                // Изменяем текст на кнопке или добавляем спиннер
+                submitButton.innerHTML = 'Сбрасываем...';
+
             });
 
 
@@ -113,18 +117,44 @@
                 const loginLink = document.getElementById('login-link');
 
                 if (data.status === 'error') {
+                    submitButton.style.backgroundColor = '#ccc'; // Устанавливаем серый цвет фона
+                    submitButton.style.cursor = 'pointer';
                     errorMessage.textContent = data.message;
                 } else if (data.status === 'success') {
+
                     const header = document.querySelector('h1');
-                    header.textContent = 'Проверьте ваш email для сброса пароля!';
+                    header.innerHTML = 'Ссылка для сброса пароля отправлена на ваш email.<br>Проверьте так же папку "Спам"';
+                    header.style.fontSize = '20px'; // размер шрифта
+                    header.style.color = '#007bff'; // цвет шрифта
 
                     // Делаем кнопку серой и неактивной
                     const submitButton = document.querySelector('button.submit');
+                    submitButton.innerHTML = 'Сбросить пароль';
                     submitButton.style.backgroundColor = '#ccc'; // Устанавливаем серый цвет фона
                     submitButton.style.cursor = 'not-allowed'; // Изменяем курсор на запрещающий
                     submitButton.disabled = true; // Делаем кнопку неактивной
 
                 }
+
+
+
+                const emailInput = document.getElementById('username');
+
+                emailInput.addEventListener('focus', function() {
+                    const header = document.querySelector('h1');
+                    header.textContent = 'Введите Email'; // Возвращаем изначальный текст заголовка
+                    header.style.fontSize = '24px'; // размер шрифта
+                    header.style.color = '#000000'; // цвет шрифта
+
+                    const submitButton = document.querySelector('button.submit');
+                    submitButton.innerHTML = 'Сбросить пароль';
+                    submitButton.style.backgroundColor = ''; // Возвращаем изначальный цвет фона
+                    submitButton.style.cursor = 'pointer'; // Возвращаем стандартный курсор
+                    submitButton.disabled = false; // Делаем кнопку активной
+
+                    const errorMessage = document.getElementById('error-message');
+                    errorMessage.textContent = ''; // Очищаем сообщение об ошибке
+                });
             });
 
          </script>
