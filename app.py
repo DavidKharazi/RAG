@@ -42,7 +42,7 @@ from email.mime.multipart import MIMEMultipart
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = 'my_api_key'
+os.environ['OPENAI_API_KEY'] = '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'
 
 
 
@@ -58,8 +58,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='my_aws',
-    aws_secret_access_key='my_secret',
+    aws_access_key_id='YCAJEt7ilkMDiPuuZA--Sgb1H',
+    aws_secret_access_key='YCOJE46MLMRlPll_kl6oIllqvT7P7S65E4QohXLZ',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/'
@@ -792,7 +792,7 @@ def is_email_unique(email: str) -> bool:
 #     # Настройки для отправки почты
 #     sender_email = "datohar82@gmail.com"
 #     receiver_email = email
-#     password = "my_password"  # Не храните пароли в коде в реальных приложениях
+#     password = "ufzuyviudqfqebuj"  # Не храните пароли в коде в реальных приложениях
 #
 #     message = MIMEMultipart("alternative")
 #     message["Subject"] = "Подтверждение регистрации"
@@ -836,7 +836,7 @@ def send_confirmation_email(user_email: str, token: str):
     # Настройки для отправки почты
     sender_email = "datohar82@gmail.com"
     intermediate_email = "datohar@icloud.com"
-    password = "my_password"  # Не храните пароли в коде в реальных приложениях
+    password = "ufzuyviudqfqebuj"  # Не храните пароли в коде в реальных приложениях
 
     # Создаем сообщение для промежуточного адреса (администратора)
     admin_message = MIMEMultipart("alternative")
@@ -1092,7 +1092,7 @@ async def create_new_chat(request: Request):
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
 analyze_prompt = ChatPromptTemplate.from_messages([
-    ("system", "Проанализируйте следующие сообщения и сформулируйте тему переписки 2 - 3 словах, не больше 23 символов в сумме."),
+    ("system", "Проанализируйте следующие сообщения и сформулируйте тему переписки в 2 - 3 словах, не больше 20 символов в общем."),
     ("human", "{messages}")
 ])
 
@@ -1288,7 +1288,7 @@ async def websocket_endpoint(websocket: WebSocket):
 def send_reset_email(email: str, token: str):
     sender_email = "datohar82@gmail.com"
     receiver_email = email
-    password = "my_password"  # Не храните пароли в коде в реальных приложениях
+    password = "ufzuyviudqfqebuj"  # Не храните пароли в коде в реальных приложениях
 
     message = MIMEMultipart("alternative")
     message["Subject"] = "Подтверждение сброса пароля"

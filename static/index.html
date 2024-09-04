@@ -86,6 +86,7 @@
         ._sidebar_8cx28_43 {
             background-color: #f9f9f9;
             display: flex;
+            /*flex-direction: column-reverse;*/
             max-width: 260px;
             width: 260px;
             flex-direction: column;
@@ -97,7 +98,7 @@
             top: 70px;
             left: -260px; /* Скрываем панель за пределы экрана */
             bottom: 0;
-            transition: left 0.3s ease; /* Добавляем плавный переход */
+            transition: left 0.3s ease;
         }
 
         /* Выдвинутая боковая панель */
@@ -180,7 +181,6 @@
 
 
         .chat-item {
-
             padding: 15px;
             display: flex;
             justify-content: space-between;
@@ -921,6 +921,7 @@
                                     </div>
                                     <div class="chat-header">
                                     <div id="chat-title">Выберите чат</div>
+                                    <div class="loading" id="loading">Loading...</div>
                                     </div>
                                     </div>
                                 </div>
@@ -977,6 +978,7 @@
         let typingIndicator;
         let socket;
         const logoutButton = document.getElementById('logoutMenu');
+
 
 
         async function initialize() {
@@ -1241,7 +1243,6 @@
 
 
 
-
         const names = [
           'Алексей', 'Анастасия', 'Андрей', 'Анна', 'Антон', 'Арина', 'Артем', 'Вадим', 'Валентин', 'Валерия',
           'Василий', 'Вера', 'Виктор', 'Виктория', 'Владимир', 'Галина', 'Георгий', 'Дарья', 'Денис', 'Дмитрий',
@@ -1281,13 +1282,6 @@
             const chatTitleElement = chatElement.querySelector('.chat-title');
             const selectButton = chatElement.querySelector('.select-chat');
             const popupMenu = chatElement.querySelector('.popup-menu');
-            const chatPanel = document.querySelector('.chat-panel');
-            if (chatPanel) {
-                chatPanel.appendChild(chatElement);
-            }
-
-            chatList.appendChild(chatElement);
-            addScrollListener();
 
 
             chatTitleElement.onclick = () => switchChat(chatId);
@@ -1319,7 +1313,6 @@
 
 
 
-             // Переименование чата без всплывающего окна
             popupMenu.querySelector('.edit-chat').onclick = () => {
                 const previousName = chatTitleElement.textContent.trim(); // Сохраняем текущее название
 
@@ -1327,6 +1320,14 @@
                 chatTitleElement.classList.add('editing');
                 chatTitleElement.focus();
                 chatTitleElement.style.cursor = 'text';
+
+                // Перемещаем курсор в конец текста
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(chatTitleElement);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
 
                 const saveChatTitle = async () => {
                     const newTopic = chatTitleElement.textContent.trim();
@@ -1363,16 +1364,32 @@
                     chatTitleElement.style.cursor = 'pointer';
                 };
 
+                // Ограничение на 28 символов
+                chatTitleElement.addEventListener('input', () => {
+                    if (chatTitleElement.textContent.length > 20) {
+                        chatTitleElement.textContent = chatTitleElement.textContent.slice(0, 20);
+                        // Перемещаем курсор в конец текста после обрезки
+                        const range = document.createRange();
+                        const sel = window.getSelection();
+                        range.setStart(chatTitleElement.childNodes[0], chatTitleElement.textContent.length);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                });
+
                 // Сохранение данных при нажатии Enter или потере фокуса
-                chatTitleElement.addEventListener('blur', saveChatTitle, { once: true });
+                chatTitleElement.addEventListener('blur', saveChatTitle);
+
                 chatTitleElement.addEventListener('keydown', (event) => {
                     if (event.key === 'Enter') {
                         event.preventDefault(); // предотвратить вставку новой строки
-                        chatTitleElement.blur(); // триггер для сохранения
+                        chatTitleElement.blur(); // триггер для сохранения через событие blur
                     }
-                }, { once: true });
+                });
 
                 popupMenu.classList.remove('active');
+
             };
 
 
@@ -1390,9 +1407,11 @@
             };
 
 
-
-            chatList.appendChild(chatElement);
-
+            if (chatList.firstChild) {
+                chatList.insertBefore(chatElement, chatList.firstChild);
+            } else {
+                chatList.appendChild(chatElement);
+            }
             // Добавляем обработчик скролла для окна и всех скроллируемых элементов
             addScrollListener();
 
@@ -1497,6 +1516,7 @@
 
 
         function addMessage(from, message, isSelf = false) {
+            removeImageOnInput();
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
             if (isSelf) messageElement.classList.add('self');
@@ -1653,29 +1673,6 @@
 
 
 
-
-        // async function loadChatMessages(chatId) {
-        //     console.log(`Loading messages for chat ID: ${chatId}`);
-        //     try {
-        //         const response = await fetch(`/get_chat_messages/${chatId}`);
-        //         if (!response.ok) {
-        //             throw new Error('Failed to load chat messages');
-        //         }
-        //
-        //         const data = await response.json();
-        //         const messages = data.messages;
-        //
-        //         // Очищаем текущие сообщения перед добавлением новых
-        //         chat.innerHTML = '';
-        //
-        //         messages.forEach(message => {
-        //             addStructuredMessage(message.sender, message.messages, message.sent_at);
-        //         });
-        //     } catch (error) {
-        //         console.error('Error loading chat messages:', error);
-        //     }
-        // }
-
         async function loadChatMessages(chatId) {
             console.log(`Loading messages for chat ID: ${chatId}`);
             try {
@@ -1689,7 +1686,6 @@
 
                 // Очищаем текущие сообщения перед добавлением новых
                 chat.innerHTML = '';
-
                 // Добавляем сообщения, если они есть
                 messages.forEach(message => {
                     addStructuredMessage(message.sender, message.messages, message.sent_at);
@@ -1711,6 +1707,14 @@
             }
         }
 
+
+
+
+
+
+
+
+
         // Функция для удаления картинки при написании сообщения
         function removeImageOnInput() {
             const img = document.getElementById('no-message-img');
@@ -1719,19 +1723,7 @@
             }
         }
 
-        // Привязываем удаление картинки к кнопке отправки
-        sendButton.addEventListener('click', function() {
-            removeImageOnInput();
-            sendMessage(); // Отправляем сообщение после удаления картинки
-        });
 
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                removeImageOnInput();
-                sendMessage(); // Отправляем сообщение после удаления картинки
-                e.preventDefault(); // Предотвращаем стандартное поведение Enter (например, перевод строки)
-            }
-        });
 
 
 
