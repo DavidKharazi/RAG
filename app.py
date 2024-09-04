@@ -42,7 +42,7 @@ from email.mime.multipart import MIMEMultipart
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = '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'
+os.environ['OPENAI_API_KEY'] = 'my_api_key'
 
 
 
