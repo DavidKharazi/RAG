@@ -42,7 +42,7 @@ from email.mime.multipart import MIMEMultipart
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = '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'
+os.environ['OPENAI_API_KEY'] = 'my_api'
 
 
 
@@ -58,8 +58,8 @@ session = boto3.session.Session()
 s3_client = session.client(
     service_name='s3',
     endpoint_url='https://storage.yandexcloud.net',
-    aws_access_key_id='YCAJEt7ilkMDiPuuZA--Sgb1H',
-    aws_secret_access_key='YCOJE46MLMRlPll_kl6oIllqvT7P7S65E4QohXLZ',
+    aws_access_key_id='my_aws',
+    aws_secret_access_key='my_secret',
 )
 
 CHROMA_PATH = f'./chroma/{current_user}/'
@@ -123,7 +123,7 @@ def init_metadata_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             messages VARCHAR(255),
             sender VARCHAR(255),
-            sent_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+            sent_at TIMESTAMP DEFAULT (datetime('now', 'localtime', '+3 hours')),
             session_id INTEGER,
             FOREIGN KEY (session_id) REFERENCES Session(id)
         );
@@ -677,59 +677,84 @@ chat_history_for_chain = SQLiteChatHistory()
 
 
 # prompt_sys = '''
-#         Context:
-#             {context}
-#         You are an assistant for question-answering tasks. Your aim is to help to new employees with job-specific questions.
-#         You should help them with propper actions, recomendations abouts software using the following pieces of retrieved context.
-#         You can also use information from chat_history to better understand the problem if necessary.
-#         Use only {context} for consultation. Do not search for information on the Internet
-#         First understand the meaning of the user's question, and then look for information in {context}.
-#         If you don't find the answer in the {context}, just say 'I don't know', e.g.:
-#         Answer the question based only on the context above. If the answer is not in the context, say "Из представленного контекста ответа нет".
-#         If you meet links to the images in your context always display them in your response.
-#         The context which you should use: {context}
-#         Question: {question}
+# Вы - ассистент для ответов на вопросы, предназначенный для помощи новым сотрудникам с вопросами, связанными с работой.
+# Ваша цель - предоставлять правильные действия и рекомендации относительно программного обеспечения на основе предоставленного контекста.
+#
+# ВАЖНО: Вы АБСОЛЮТНО ОГРАНИЧЕНЫ использованием ТОЛЬКО информации, предоставленной в следующем контексте:
+#
+# Контекст:
+# {context}
+#
+# СТРОГИЕ ПРАВИЛА:
+# 1. Используйте ИСКЛЮЧИТЕЛЬНО информацию из предоставленного контекста. НИКОГДА не обращайтесь к внешним источникам или своим знаниям.
+# 2. НЕ ВЫДУМЫВАЙТЕ информацию. Если ответа нет в контексте, скажите "Ответ не найден, пожалуйста, уточните ваш вопрос".
+# 3. НЕ рассказывайте анекдоты, НЕ обсуждайте темы, не связанные с контекстом.
+# 4. Если в контексте есть ссылки на изображения, отобразите их в вашем ответе.
+#
+# ПРОЦЕСС ОТВЕТА:
+# 1. Внимательно прочитайте вопрос пользователя.
+# 2. Проанализируйте предоставленный контекст на наличие прямого ответа.
+# 3. Если прямой ответ не найден, повторно проанализируйте контекст, ища семантические сходства с вопросом.
+# 4. Если ответ все еще не найден, ответьте: "Ответ не найден, пожалуйста, уточните ваш вопрос".
+#
+# Вопрос: {question}
 # '''
-
-
-
-# prompt_sys = '''
-#         Context:
-#             {context}
-#         You are an assistant for question-answering tasks, aimed at helping new employees with job-specific questions.
-#         Your goal is to provide proper actions and recommendations regarding software based on the retrieved context.
-#         Strictly use only the information provided in the {context}. Do not search for additional information online, tell jokes, or discuss topics unrelated to the given context. If the information is not in the context, simply state: "Из представленного контекста ответа нет".
-#         Use only the provided {context} for consultation. Do not search for information on the Internet or outside the given context.
-#         First, understand the user's question, and then look for information in the {context}.
-#         If the answer is not directly in the {context}, analyze the context again, looking for semantic similarities with the query. If after this analysis the answer is still not found, respond: "Ответ не найден, пожалуйста уточните ваш вопрос".
-#         If the context includes links to images, display them in your response.
-#         Context: {context}
-#         Question: {question}
-# '''
-
 
 prompt_sys = '''
-Вы - ассистент для ответов на вопросы, предназначенный для помощи новым сотрудникам с вопросами, связанными с работой.
-Ваша цель - предоставлять правильные действия и рекомендации относительно программного обеспечения на основе предоставленного контекста.
+Context:
+    {context}
 
-ВАЖНО: Вы АБСОЛЮТНО ОГРАНИЧЕНЫ использованием ТОЛЬКО информации, предоставленной в следующем контексте:
+You are an AI assistant helping new employees with job-specific questions. Your goal is to provide accurate and helpful responses based on the given context.
 
-Контекст:
-{context}
+Instructions for semantic analysis:
 
-СТРОГИЕ ПРАВИЛА:
-1. Используйте ИСКЛЮЧИТЕЛЬНО информацию из предоставленного контекста. НИКОГДА не обращайтесь к внешним источникам или своим знаниям.
-2. НЕ ВЫДУМЫВАЙТЕ информацию. Если ответа нет в контексте, скажите "Ответ не найден, пожалуйста, уточните ваш вопрос".
-3. НЕ рассказывайте анекдоты, НЕ обсуждайте темы, не связанные с контекстом.
-4. Если в контексте есть ссылки на изображения, отобразите их в вашем ответе.
+1. Verb Focus:
+   - Identify the main verb(s) in the question (e.g., "назначить" / "assign").
+   - Consider synonyms and related actions for this verb (e.g., "appoint", "delegate", "nominate").
+   - Look for these verbs and their synonyms in the context.
 
-ПРОЦЕСС ОТВЕТА:
-1. Внимательно прочитайте вопрос пользователя.
-2. Проанализируйте предоставленный контекст на наличие прямого ответа.
-3. Если прямой ответ не найден, повторно проанализируйте контекст, ища семантические сходства с вопросом.
-4. Если ответ все еще не найден, ответьте: "Ответ не найден, пожалуйста, уточните ваш вопрос".
+2. Event Analysis:
+   - Identify key events or situations in the question (e.g., "отпуск" / "vacation").
+   - Consider related scenarios (e.g., "temporary absence", "leave", "time off").
+   - Search for information about these events and related situations in the context.
 
-Вопрос: {question}
+3. Semantic Expansion:
+   - For the main verb, think about:
+     * Different ways to express the action
+     * Formal and informal variants
+     * Related processes or procedures
+   - For the key event, consider:
+     * Various types or categories of the event
+     * Associated policies or guidelines
+     * Typical duration or frequency
+
+4. Context Examination:
+   - Scan the {context} for:
+     * Exact matches of verbs and events
+     * Synonyms and semantically related terms
+     * Procedural information related to the action and event
+
+5. Answer Formulation:
+   - If you find relevant information, construct your answer focusing on the action (verb) and the event.
+   - Explain any procedures, policies, or guidelines related to the action and event.
+   - If the exact scenario isn't found, provide information on the most closely related processes.
+
+6. Clarity Check:
+   - Ensure your answer directly addresses the action (verb) the user wants to take.
+   - Confirm that your response is relevant to the specific event or situation mentioned.
+
+7. Image and Additional Info:
+   - Include any relevant images from the context if available.
+   - Use chat_history if it provides additional relevant context.
+
+STRICT RULES:
+   - DO NOT tell jokes, DO NOT discuss topics out of context.
+
+If after this analysis you can't find semantically related information, respond with: "There is no specific information about [verb] for [event] in the provided context."
+
+Remember: Use only the {context} provided. Do not search for or provide information from external sources.
+
+Question: {question}
 '''
 
 
@@ -881,15 +906,15 @@ def send_confirmation_email(user_email: str, token: str):
     Вы получите уведомление после проверки.
 
     С уважением,
-    Ваша команда поддержки.
+    Ваша команда поддержки А100!
     """
     user_html = f"""
     <html>
     <body>
         <p>Уважаемый пользователь,</p>
-        <p>Ваша заявка на регистрацию получена и будет рассмотрена администратором в ближайшее время.</p>
+        <p>Ваша заявка на регистрацию в сервисе Cyberman A100 получена и будет рассмотрена администратором в ближайшее время.</p>
         <p>Вы получите уведомление после проверки.</p>
-        <p>С уважением,<br>Ваша команда поддержки.</p>
+        <p>С уважением,<br>Ваша команда поддержки A100.</p>
     </body>
     </html>
     """
@@ -1298,7 +1323,7 @@ def send_reset_email(email: str, token: str):
     # reset_url = f"http://localhost:8222/confirm-reset?token={token}&email={email}"
     reset_url = f"https://chata100.up.railway.app/confirm-reset?token={token}&email={email}"
 
-    text = f"Пожалуйста, подтвердите сброс пароля, перейдя по следующей ссылке: {reset_url}"
+    text = f"Пожалуйста, подтвердите сброс пароля для сервиса Cyberman A100, перейдя по следующей ссылке: {reset_url}"
     html = f"""
     <html>
     <body>

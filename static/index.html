@@ -3,7 +3,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CyberMan A100</title>
     <link rel="icon" type="image/svg+xml" href="/icon/cyberMan.svg">
     <style type="text/css">
@@ -775,51 +775,47 @@
         @media (max-width: 767px) {
     body {
         font-size: 14px; /* Уменьшаем размер шрифта для мобильных устройств */
-    }
-
-    ._chatContainer_8cx28_1 {
-        flex-direction: column; /* Размещаем элементы в колонку */
-        min-height: 100vh; /* Занимаем всю высоту экрана */
+        z-index: 10;
     }
 
 
 
-    ._contentWrapper_8cx28_27 {
-        height: calc(100vh - 56px - 54px); /* Учитываем высоту верхней панели и поля ввода */
-        overflow-y: auto; /* Разрешаем прокрутку */
-    }
 
-    ._sidebar_8cx28_43 {
-        display: none; /* Скрываем боковую панель на мобильных устройствах */
-    }
-
-    ._chatLog_8cx28_63 {
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    ._topBar_8cx28_77 {
-        padding: 8px; /* Уменьшаем отступы в верхней панели */
-        gap: 8px;
-    }
 
     #new-chat {
         display: block; /* Убедимся, что кнопка "Новый чат" видна */
         margin: 0 auto; /* Центрируем кнопку */
         width: 40px;
         height: 40px;
+        position: fixed;
     }
 
     #chat {
         margin: 0; /* Убираем отступы */
         max-width: 100%; /* Ширина чата не превышает ширину экрана */
         min-width: 100%;
+        right: 130px;
+    }
+
+
+    .message { /* Закрепляем элемент у нижней границы экрана */
+        position: absolute;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        top: 100px;
+        bottom: 0;
+        width: 90%;
+        max-height: 70%;
+        padding: 10px;
+        background-color: white;
+        display: flex;
+
     }
 
     .message-container {
         position: fixed; /* Закрепляем элемент у нижней границы экрана */
         bottom: 25px;
-        left: 180px;
+        left: 190px;
         width: 90%;
         max-height: 80px; /* Ограничиваем высоту поля ввода */
         border: none; /* Убираем границу */
@@ -830,10 +826,10 @@
         align-items: center;
     }
 
-    input[type="text"] {
-        width: calc(100% - 50px); /* Уменьшаем ширину поля ввода */
-        font-size: 16px;
-    }
+/*    input[type="text"] {*/
+/*        width: calc(100% - 50px); !* Уменьшаем ширину поля ввода *!*/
+/*        font-size: 16px;*/
+/*    }*/
 
     .send {
         width: 40px;
@@ -845,15 +841,15 @@
         margin-left: 10px; /* Отступ от поля ввода */
     }
 
-    .message {
-        margin: 10px 0; /* Уменьшаем отступы между сообщениями */
-    }
+/*    .message {*/
+/*        margin: 10px 0; !* Уменьшаем отступы между сообщениями *!*/
+/*    }*/
 
-    .message .avatar {
-        width: 30px;
-        height: 30px;
-        font-size: 14px; /* Уменьшаем размер шрифта аватара */
-    }
+/*    .message .avatar {*/
+/*        width: 30px;*/
+/*        height: 30px;*/
+/*        font-size: 14px; !* Уменьшаем размер шрифта аватара *!*/
+/*    }*/
 
     .message .text {
         font-size: 14px; /* Уменьшаем размер шрифта сообщений */
@@ -865,11 +861,9 @@
     }
 
     ._topNavigationTitle_gmqqc_39 {
-        font-size: 16px; /* Уменьшаем размер шрифта заголовка */
+        font-size: 18px; /* Уменьшаем размер шрифта заголовка */
     }
 }
-
-
 
 
 
@@ -882,7 +876,6 @@
         <section class="_mainSection_8cx28_11">
             <div class="_contentWrapper_8cx28_27">
                 <div class="side_bar">
-                            <button class="_iconButton_8cx28_97"></button>
                             <button id="new-chat"><img src="static/icons/newChat.svg" alt="New Chat"
                                                                       class="_iconImage_8cx28_127"></button>
                 </div>
@@ -1066,11 +1059,12 @@
                     if (chatElement) {
                         const chatTitleElement = chatElement.querySelector('.chat-title');
                         if (chatTitleElement) {
-                            chatTitleElement.textContent = newTopic;
+                            // Обрезаем новую тему до 20 символов и добавляем многоточие, если она длиннее
+                            const truncatedTopic = newTopic.length > 20 ? newTopic.substring(0, 20) + '...' : newTopic;
+                            chatTitleElement.textContent = truncatedTopic;
                         }
                     }
                 }
-
 
 
 
@@ -1194,7 +1188,8 @@
                 }
                 const topics = await response.json();
                 return topics.reduce((acc, item) => {
-                    acc[item.id] = item.topic;
+                    // Обрезаем тему до 20 символов и добавляем многоточие, если она длиннее
+                    acc[item.id] = item.topic.length > 20 ? item.topic.substring(0, 20) + '...' : item.topic;
                     return acc;
                 }, {});
             } catch (error) {
@@ -1711,10 +1706,6 @@
 
 
 
-
-
-
-
         // Функция для удаления картинки при написании сообщения
         function removeImageOnInput() {
             const img = document.getElementById('no-message-img');
@@ -1725,52 +1716,32 @@
 
 
 
-
-
         function formatMessage(message) {
-            const urlRegex = /(https:\/\/[^\s]+\.png)/gi;
-            const imageInfoText = "Для более подробной информации вы можете ознакомиться с изображениями:";
-            let uniqueUrls = new Set();
+            // Регулярное выражение для поиска шаблонов изображений и ссылок
+            const imageTemplateRegex = /!\[[^\]]*\]\(|https:\/\/[^\s]+\.png\)?/gi;
 
-            // Извлекаем все URL-адреса изображений
-            let match;
-            while ((match = urlRegex.exec(message)) !== null) {
-                const url = extractValidUrl(match[0]);
-                if (url) {
-                    uniqueUrls.add(url);
+            // Заменяем шаблоны изображений на HTML-код изображений
+            let formattedMessage = message.replace(imageTemplateRegex, (match) => {
+                if (match.startsWith('http')) {
+                    // Если это ссылка на изображение
+                    // Убираем лишнюю закрывающую скобку )
+                    const cleanedMatch = match.replace(/\)$/, '');
+                    return `<div style="margin-bottom: 10px;">
+                                <p><strong></strong></p>
+                                <img src="${cleanedMatch}" style="max-width: 100%; height: auto;"/>
+                            </div>\n`;
+                } else {
+                    // Если это шаблон вида ![Текст](
+                    // Извлекаем только слова и удаляем скобки, восклицательные знаки и прочие символы
+                    const wordsOnly = match.replace(/[!()[\]]/g, '').trim();
+                    return wordsOnly; // Возвращаем только слова без символов
                 }
-            }
+            });
 
-
-            // Удаляем ссылки на изображения и шаблоны вида ![image_10]()
-            let cleanedMessage = message
-                .replace(/https?:\/\/\S+\.(jpg|jpeg|png|gif)/gi, '')  // Удаляем ссылки на изображения
-                .replace(/!\[image_\d+\]\(\)/gi, '')  // Удаляем шаблоны вида ![image_10]()
-                .trim();
-
-            // Если в сообщении есть изображения
-            if (uniqueUrls.size > 0) {
-                let imagesHtml = '';
-                uniqueUrls.forEach(url => {
-                    imagesHtml += `<a href="${url}" target="_blank"><img src="${url}" alt="Image" style="max-width: 100%; height: auto;"/></a>\n`;
-                });
-
-                // Формируем итоговое сообщение: сначала текст, потом изображения
-                return `${cleanedMessage}<div style="margin-bottom: 20px;"></div>${imagesHtml}`;
-            }
-
-            // Если изображений нет, возвращаем очищенное сообщение
-            return cleanedMessage;
-
-
-
+            return formattedMessage.trim(); // Возвращаем результат
         }
 
-        function extractValidUrl(text) {
-            const validUrlRegex = /^https:\/\/.*\.png$/i;
-            const match = text.match(validUrlRegex);
-            return match ? match[0] : null;
-        }
+
 
 
 
