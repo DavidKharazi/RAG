@@ -439,15 +439,28 @@
 
             const registerData = await registerResponse.json();
 
-            if (registerResponse.status === 401) {
-              errorField.textContent =
-                registerData.message ||
-                "Пользователь с таким именем уже существует.";
+            // if (registerResponse.status === 401) {
+            //   errorField.textContent =
+            //     registerData.message ||
+            //     "Пользователь с таким именем уже существует.";
+            //   resetButtonState();
+            // } else if (
+            //   registerResponse.status === 200 &&
+            //   registerData.redirect
+            // ) {
+            //   const loginFormData = new FormData();
+            //   loginFormData.append("username", email);
+            //   loginFormData.append("password", password);
+
+            if (registerResponse.status === 400) {
+              // Если получаем ошибку 400, показываем сообщение об ошибке
+              errorField.textContent = registerData.message || "Неправильная структура пароля.";
               resetButtonState();
-            } else if (
-              registerResponse.status === 200 &&
-              registerData.redirect
-            ) {
+            } else if (registerResponse.status === 401) {
+              errorField.textContent =
+                registerData.message || "Пользователь с таким именем уже существует.";
+              resetButtonState();
+            } else if (registerResponse.status === 200 && registerData.redirect) {
               const loginFormData = new FormData();
               loginFormData.append("username", email);
               loginFormData.append("password", password);
@@ -539,7 +552,7 @@
         <input
           type="password"
           name="password"
-          placeholder="Password"
+          placeholder="Пароль (мин. 8 символов, 1 заглавная, 1 цифра, 1 символ)"
           required
         />
         <button type="submit" id="register-button" class="register">

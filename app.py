@@ -15,7 +15,7 @@ from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import AIMessage, HumanMessage
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Form, Request, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, validator
 from starlette.staticfiles import StaticFiles
 from passlib.context import CryptContext
 import uvicorn
@@ -37,6 +37,7 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import re
 
 
 load_dotenv()
@@ -675,7 +676,7 @@ def format_docs(docs):
 chat_history_for_chain = SQLiteChatHistory()
 
 
-
+#
 # prompt_sys = '''
 # Вы - ассистент для ответов на вопросы, предназначенный для помощи новым сотрудникам с вопросами, связанными с работой.
 # Ваша цель - предоставлять правильные действия и рекомендации относительно программного обеспечения на основе предоставленного контекста.
@@ -700,61 +701,116 @@ chat_history_for_chain = SQLiteChatHistory()
 # Вопрос: {question}
 # '''
 
+# prompt_sys = '''
+# Context:
+#     {context}
+#
+# You are an AI assistant helping new employees with job-specific questions. Your goal is to provide accurate and helpful responses based on the given context.
+#
+# Instructions for semantic analysis:
+#
+# 1. Verb Focus:
+#    - Identify the main verb(s) in the question (e.g., "назначить" / "assign").
+#    - Consider synonyms and related actions for this verb (e.g., "appoint", "delegate", "nominate").
+#    - Look for these verbs and their synonyms in the context.
+#
+# 2. Event Analysis:
+#    - Identify key events or situations in the question (e.g., "отпуск" / "vacation").
+#    - Consider related scenarios (e.g., "temporary absence", "leave", "time off").
+#    - Search for information about these events and related situations in the context.
+#
+# 3. Semantic Expansion:
+#    - For the main verb, think about:
+#      * Different ways to express the action
+#      * Formal and informal variants
+#      * Related processes or procedures
+#    - For the key event, consider:
+#      * Various types or categories of the event
+#      * Associated policies or guidelines
+#      * Typical duration or frequency
+#
+# 4. Context Examination:
+#    - Scan the {context} for:
+#      * Exact matches of verbs and events
+#      * Synonyms and semantically related terms
+#      * Procedural information related to the action and event
+#
+# 5. Answer Formulation:
+#    - If you find relevant information, construct your answer focusing on the action (verb) and the event.
+#    - Explain any procedures, policies, or guidelines related to the action and event.
+#    - If the exact scenario isn't found, provide information on the most closely related processes.
+#    - ALWAYS respond in Russian.
+#
+# 6. Clarity Check:
+#    - Ensure your answer directly addresses the action (verb) the user wants to take.
+#    - Confirm that your response is relevant to the specific event or situation mentioned.
+#
+# 7. Image and Additional Info:
+#    - Include any relevant images from the context if available.
+#    - Use chat_history if it provides additional relevant context.
+#
+# STRICT RULES:
+#    - DO NOT tell jokes, DO NOT discuss topics out of context.
+#
+# If after this analysis you can't find semantically related information, respond with: "There is no specific information about [verb] for [event] in the provided context."
+#
+# Remember: Use only the {context} provided. Do not search for or provide information from external sources.
+#
+# Question: {question}
+# '''
+
 prompt_sys = '''
-Context:
+Контекст:
     {context}
 
-You are an AI assistant helping new employees with job-specific questions. Your goal is to provide accurate and helpful responses based on the given context.
+Вы - ИИ-ассистент, помогающий новым сотрудникам с вопросами, связанными с работой. Ваша цель - предоставлять точные и полезные ответы на основе данного контекста.
 
-Instructions for semantic analysis:
+Инструкции по семантическому анализу:
 
-1. Verb Focus:
-   - Identify the main verb(s) in the question (e.g., "назначить" / "assign").
-   - Consider synonyms and related actions for this verb (e.g., "appoint", "delegate", "nominate").
-   - Look for these verbs and their synonyms in the context.
+1. Ссылки на изображения:
+   - Включите в ответ любые релевантные ссылки из контекста {context} начинающиеся https://storage.yandexcloud.net/
+   - Пришлите сами ссылки с ответом.
 
-2. Event Analysis:
-   - Identify key events or situations in the question (e.g., "отпуск" / "vacation").
-   - Consider related scenarios (e.g., "temporary absence", "leave", "time off").
-   - Search for information about these events and related situations in the context.
+2. Фокус на глаголах:
+   - Определите основной глагол(ы) в вопросе (например, "назначить").
+   - Рассмотрите синонимы и связанные действия для этого глагола (например, "поручить", "делегировать", "номинировать").
+   - Ищите эти глаголы и их синонимы в контексте.
 
-3. Semantic Expansion:
-   - For the main verb, think about:
-     * Different ways to express the action
-     * Formal and informal variants
-     * Related processes or procedures
-   - For the key event, consider:
-     * Various types or categories of the event
-     * Associated policies or guidelines
-     * Typical duration or frequency
+3. Анализ событий:
+   - Определите ключевые события или ситуации в вопросе (например, "отпуск").
+   - Рассмотрите связанные сценарии (например, "временное отсутствие", "отгул", "выходной").
+   - Ищите информацию об этих событиях и связанных ситуациях в контексте.
 
-4. Context Examination:
-   - Scan the {context} for:
-     * Exact matches of verbs and events
-     * Synonyms and semantically related terms
-     * Procedural information related to the action and event
+4. Семантическое расширение:
+   - Для основного глагола подумайте о:
+     * Различных способах выражения действия
+     * Формальных и неформальных вариантах
+     * Связанных процессах или процедурах
+   - Для ключевого события рассмотрите:
+     * Различные типы или категории события
+     * Связанные политики или руководства
+     * Типичную продолжительность или частоту
 
-5. Answer Formulation:
-   - If you find relevant information, construct your answer focusing on the action (verb) and the event.
-   - Explain any procedures, policies, or guidelines related to the action and event.
-   - If the exact scenario isn't found, provide information on the most closely related processes.
+5. Изучение контекста:
+   - Просмотрите {context} на предмет:
+     * Точных совпадений глаголов и событий
+     * Синонимов и семантически связанных терминов
+     * Процедурной информации, связанной с действием и событием
 
-6. Clarity Check:
-   - Ensure your answer directly addresses the action (verb) the user wants to take.
-   - Confirm that your response is relevant to the specific event or situation mentioned.
+6. Формулировка ответа:
+   - Если вы нашли релевантную информацию, составьте ответ, фокусируясь на действии (глаголе) и событии.
+   - Объясните любые процедуры, политики или руководства, связанные с действием и событием.
+   - ВАЖНО!!!: Если точный ответ не найден, предоставьте информацию о наиболее близких процессах. А так же задайте уточняющие вопрос. 
 
-7. Image and Additional Info:
-   - Include any relevant images from the context if available.
-   - Use chat_history if it provides additional relevant context.
 
-STRICT RULES:
-   - DO NOT tell jokes, DO NOT discuss topics out of context.
+СТРОГИЕ ПРАВИЛА:
+   - НЕ рассказывайте шутки, НЕ обсуждайте темы вне контекста.
+   - ВСЕГДА отвечайте на русском языке.
+   - ВСЕГДА включайте ВСЕ найденные ссылки (URL) из контекста в ваш ответ.
 
-If after this analysis you can't find semantically related information, respond with: "There is no specific information about [verb] for [event] in the provided context."
+Помните: Используйте только предоставленный {context}. Не ищите и не предоставляйте информацию из внешних источников.
 
-Remember: Use only the {context} provided. Do not search for or provide information from external sources.
-
-Question: {question}
+Вопрос: {question}
 '''
 
 
@@ -943,17 +999,69 @@ def send_confirmation_email(user_email: str, token: str):
         print(f"Ошибка при отправке письма: {e}")
 
 
+# @app.post("/register")
+# async def post_register(username: str = Form(...), password: str = Form(...)):
+#     if not is_email_unique(username):
+#         return JSONResponse(content={"status": "error", "message": "Пользователь с таким именем уже существует."},
+#                             status_code=401)
+#     else:
+#         user_id, confirmation_token = add_user_to_db(username, password)
+#         send_confirmation_email(username, confirmation_token)
+#         return JSONResponse(
+#             content={"status": "success", "message": "На вашу почту отправлено письмо с подтверждением."},
+#             status_code=200)
+#Валидация данных регистрации
+class UserRegistration(BaseModel):
+    username: EmailStr
+    password: str
+
+    @validator('password')
+    def password_complexity(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+    @validator('username')
+    def validate_email(cls, v):
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', v):
+            raise ValueError('Invalid email format')
+        return v
+
+# Маршрут для регистрации
 @app.post("/register")
 async def post_register(username: str = Form(...), password: str = Form(...)):
+    # Создаем объект для валидации с помощью Pydantic
+    try:
+        user_data = UserRegistration(username=username, password=password)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "Неправильная структура пароля или email"}
+        )
+
+    # Проверка на уникальность email
     if not is_email_unique(username):
         return JSONResponse(content={"status": "error", "message": "Пользователь с таким именем уже существует."},
                             status_code=401)
-    else:
-        user_id, confirmation_token = add_user_to_db(username, password)
-        send_confirmation_email(username, confirmation_token)
-        return JSONResponse(
-            content={"status": "success", "message": "На вашу почту отправлено письмо с подтверждением."},
-            status_code=200)
+
+    # Логика добавления пользователя в базу данных
+    user_id, confirmation_token = add_user_to_db(username, password)
+    send_confirmation_email(username, confirmation_token)
+
+    return JSONResponse(
+        content={"status": "success", "message": "На вашу почту отправлено письмо с подтверждением."},
+        status_code=200
+    )
+
+
 
 
 @app.get("/confirm-email")
@@ -1040,7 +1148,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
             print(f"Error starting session: {e}")
             return JSONResponse(content={"status": "error", "message": "Failed to start session"}, status_code=500)
     else:
-        return JSONResponse(content={"status": "error", "message": "Пользователь не найден или не активирован"},
+        return JSONResponse(content={"status": "error", "message": "Неправильный логин или пароль"},
                             status_code=401)
 
 
@@ -1232,31 +1340,37 @@ async def get_chat_topics():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
+    # Ожидание email от клиента
     email = websocket.query_params.get('email')
     if email is None:
         await websocket.send_json({"error": "Требуется email"})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    # Проверка пользователя по имеил через функцию get_user_by_email
     user = get_user_by_email(email)
     if user is None:
         await websocket.send_json({"error": "Пользователь не найден"})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    # распаковка кортежа, который возвращается функцией get_user_by_email
     user_id, cyberman_id = user
 
+    # поиск текущей сессии пользователя с кибер-агентом
     session = get_session_by_user_and_cyberman(user_id, cyberman_id)
     if session is None:
         await websocket.send_json({"error": "Сессия не найдена"})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    # получение первого значения(id) из списка или кортежа инфо о сессиии
     session_id = session[0]
+    # получения текущей темы чата через get_topic
     topic = get_topic(session_id)
-
     chat_history_for_chain.current_session_id = session_id
 
+    # Получение истории сообщений через db_manager.get_chat_messages_by_session_id и отправка по вебсокету
     messages = db_manager.get_chat_messages_by_session_id(session_id)
     await websocket.send_json({"messages": messages, "topic": topic})
     try:
@@ -1287,6 +1401,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"error": str(e)})
                 continue
 
+            print("Ответ модели: ", answer)
             if answer:
                 chat_history_for_chain.add_message(HumanMessage(content=question))
                 chat_history_for_chain.add_message(AIMessage(content=answer))
@@ -1496,6 +1611,17 @@ async def admin_logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/admin/login")
 
+
+from fastapi.middleware.cors import CORSMiddleware
+
+# Добавляем middleware для обработки CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Разрешаем конкретный фронтенд
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешаем любые HTTP методы
+    allow_headers=["*"],  # Разрешаем любые заголовки
+)
 
 
 
