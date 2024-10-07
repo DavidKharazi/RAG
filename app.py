@@ -47,6 +47,7 @@ os.environ['OPENAI_API_KEY'] = 'my_api'
 
 
 
+
 model_name = "gpt-4o"
 temperature = 0
 llm = ChatOpenAI(model=model_name, temperature=temperature)
@@ -800,11 +801,11 @@ prompt_sys = '''
 6. Формулировка ответа:
    - Если вы нашли релевантную информацию, составьте ответ, фокусируясь на действии (глаголе) и событии.
    - Объясните любые процедуры, политики или руководства, связанные с действием и событием.
-   - ВАЖНО!!!: Если точный ответ не найден, предоставьте информацию о наиболее близких процессах. А так же задайте уточняющие вопрос. 
+   - ВАЖНО!!!: Если точный ответ не найден, предоставьте информацию о наиболее близких процессах из контекста {context}. А так же задайте уточняющие вопрос. 
 
 
 СТРОГИЕ ПРАВИЛА:
-   - НЕ рассказывайте шутки, НЕ обсуждайте темы вне контекста.
+   - НЕ рассказывайте шутки, НЕ обсуждайте темы вне контекста. Это важно!
    - ВСЕГДА отвечайте на русском языке.
    - ВСЕГДА включайте ВСЕ найденные ссылки (URL) из контекста в ваш ответ.
 
@@ -1336,6 +1337,12 @@ async def get_chat_topics():
     return [{"id": row[0], "topic": row[1]} for row in rows]
 
 
+def get_session_history(session_id):
+    history = chat_history_for_chain.messages(limit=15)
+    print(f"Session {session_id} history: {history}")
+    return history
+
+
 @app.websocket("/ws/rag_chat/")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -1370,54 +1377,64 @@ async def websocket_endpoint(websocket: WebSocket):
     topic = get_topic(session_id)
     chat_history_for_chain.current_session_id = session_id
 
-    # Получение истории сообщений через db_manager.get_chat_messages_by_session_id и отправка по вебсокету
     messages = db_manager.get_chat_messages_by_session_id(session_id)
     await websocket.send_json({"messages": messages, "topic": topic})
+
     try:
         while True:
-
             data = await websocket.receive_json()
-
             question_data = data.get('question_data')
             if question_data is None:
                 await websocket.send_json({"error": "Требуется question_data"})
                 continue
 
             question = question_data.get('question')
-            new_session_id = question_data.get('session_id')  # Получаем session_id из сообщения
+            new_session_id = question_data.get('session_id')
+
             if new_session_id:
-                session_id = new_session_id  # Обновляем session_id, если он передан
+                session_id = new_session_id
+                chat_history_for_chain.current_session_id = session_id  # Обновляем session_id
 
             if question is None:
                 await websocket.send_json({"error": "Требуется question"})
                 continue
 
+            context = format_docs(retriever.invoke(question))
+            history = get_session_history(session_id)
+
+            request_payload = {
+                "question": question,
+                "context": context,
+                "chat_history": history
+            }
+            print(f"Request payload: {request_payload}")
+
             try:
                 answer = chain_with_message_history.invoke(
-                    {"question": question, "context": format_docs(retriever.invoke(question))},
+                    request_payload,
                     {"configurable": {"session_id": session_id}}
                 ).content
+
             except Exception as e:
                 await websocket.send_json({"error": str(e)})
                 continue
 
-            print("Ответ модели: ", answer)
             if answer:
                 chat_history_for_chain.add_message(HumanMessage(content=question))
                 chat_history_for_chain.add_message(AIMessage(content=answer))
 
-            db_manager.add_chat_message(session_id, question, "human")  # Добавляем сообщение пользователя
-            db_manager.add_chat_message(session_id, answer, "ai")  # Добавляем ответ бота
+            db_manager.add_chat_message(session_id, question, "human")
+            db_manager.add_chat_message(session_id, answer, "ai")
 
-            # Получаем количество сообщений в сессии после добавления нового сообщения
             messages = db_manager.get_chat_messages_by_session_id(session_id)
+
             if len(messages) == 3:
-                # Вызываем анализ текущей сессии только после третьего сообщения
                 analyze_current_chat_topic(user_id, session_id)
                 updated_topic = get_topic(session_id)
                 await websocket.send_json({"topic_update": updated_topic})
 
             await websocket.send_json({"answer": answer})
+
     except WebSocketDisconnect:
         chat_history_for_chain.end_session()
 
