@@ -38,12 +38,14 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import re
+from PIL import Image
 
 
 load_dotenv()
 
 
-os.environ['OPENAI_API_KEY'] = 'my_api'
+os.environ['OPENAI_API_KEY'] = 'my-api-key'
+
 
 
 
@@ -418,6 +420,65 @@ def load_s3_files(bucket: str, prefix: str, suffix: str) -> List[str]:
         return []
 
 
+# def load_docx_new(source, bucket: str) -> List[Document]:
+#     prefix = 'A100/docx/'
+#     suffix = '.docx'
+#     files = load_s3_files(bucket, prefix, suffix)
+#     uniq_files = get_uploaded_filenames(source) or []
+#
+#     docs = []
+#     for file in files:
+#         if not any(fnmatchcase(file, f"*{pattern}*") for pattern in uniq_files):
+#             try:
+#                 obj = s3_client.get_object(Bucket=bucket, Key=file)
+#                 content = obj['Body'].read()
+#
+#                 # Используем BytesIO для чтения содержимого файла как бинарного потока
+#                 doc_stream = BytesIO(content)
+#                 doc = DocxDocument(doc_stream)
+#
+#                 # Извлекаем текст из документа docx
+#                 full_text = []
+#                 image_counter = 1
+#
+#                 # Получаем имя файла без расширения и создаем соответствующую папку
+#                 filename_without_extension = os.path.splitext(os.path.basename(file))[0]
+#                 image_folder = filename_without_extension  # Используем оригинальное имя файла для папки
+#
+#                 for para in doc.paragraphs:
+#                     # Обработка параграфов для создания ссылок на изображения
+#                     para_text = para.text
+#                     for run in para.runs:
+#                         for drawing in run.element.findall('.//a:blip', namespaces={
+#                             'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}):
+#                             image_rId = drawing.get(qn('r:embed'))
+#                             image_part = doc.part.related_parts[image_rId]
+#                             image_filename = f'image_{image_counter:02d}.{image_part.content_type.split("/")[-1]}'
+#                             image_counter += 1
+#
+#                             # Загрузка изображения в бакет Яндекса
+#                             img_content = image_part.blob
+#                             s3_image_key = f"A100/images/{image_folder}/{image_filename}"
+#                             s3_client.put_object(
+#                                 Bucket=bucket,
+#                                 Key=s3_image_key,
+#                                 Body=img_content,
+#                                 ContentDisposition='inline',
+#                                 ContentType=image_part.content_type
+#                             )
+#
+#                             # Генерация URL для изображения
+#                             s3_image_url = f"https://storage.yandexcloud.net/{bucket}/{s3_image_key}"
+#                             para_text += f'\n{s3_image_url}'
+#                     full_text.append(para_text)
+#                 content = '\n'.join(full_text)
+#
+#                 docs.append(Document(source=file, page_content=content))
+#             except Exception as e:
+#                 print(f"Error reading docx file {file}: {e}")
+#
+#     return docs if docs else None
+
 def load_docx_new(source, bucket: str) -> List[Document]:
     prefix = 'A100/docx/'
     suffix = '.docx'
@@ -431,41 +492,47 @@ def load_docx_new(source, bucket: str) -> List[Document]:
                 obj = s3_client.get_object(Bucket=bucket, Key=file)
                 content = obj['Body'].read()
 
-                # Используем BytesIO для чтения содержимого файла как бинарного потока
                 doc_stream = BytesIO(content)
                 doc = DocxDocument(doc_stream)
 
-                # Извлекаем текст из документа docx
                 full_text = []
                 image_counter = 1
 
-                # Получаем имя файла без расширения и создаем соответствующую папку
                 filename_without_extension = os.path.splitext(os.path.basename(file))[0]
-                image_folder = filename_without_extension  # Используем оригинальное имя файла для папки
+                image_folder = filename_without_extension
 
                 for para in doc.paragraphs:
-                    # Обработка параграфов для создания ссылок на изображения
                     para_text = para.text
                     for run in para.runs:
                         for drawing in run.element.findall('.//a:blip', namespaces={
                             'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}):
                             image_rId = drawing.get(qn('r:embed'))
                             image_part = doc.part.related_parts[image_rId]
-                            image_filename = f'image_{image_counter:02d}.{image_part.content_type.split("/")[-1]}'
+                            original_format = image_part.content_type.split("/")[-1]
+                            image_filename = f'image_{image_counter:02d}.png'  # Всегда используем PNG
                             image_counter += 1
 
-                            # Загрузка изображения в бакет Яндекса
                             img_content = image_part.blob
+                            img = Image.open(BytesIO(img_content))
+
+                            # Конвертируем изображение в PNG, если это JPEG
+                            if original_format.lower() in ['jpeg', 'jpg']:
+                                img_byte_arr = BytesIO()
+                                img.save(img_byte_arr, format='PNG')
+                                img_content = img_byte_arr.getvalue()
+                                content_type = 'image/png'
+                            else:
+                                content_type = image_part.content_type
+
                             s3_image_key = f"A100/images/{image_folder}/{image_filename}"
                             s3_client.put_object(
                                 Bucket=bucket,
                                 Key=s3_image_key,
                                 Body=img_content,
                                 ContentDisposition='inline',
-                                ContentType=image_part.content_type
+                                ContentType=content_type
                             )
 
-                            # Генерация URL для изображения
                             s3_image_url = f"https://storage.yandexcloud.net/{bucket}/{s3_image_key}"
                             para_text += f'\n{s3_image_url}'
                     full_text.append(para_text)
@@ -476,6 +543,7 @@ def load_docx_new(source, bucket: str) -> List[Document]:
                 print(f"Error reading docx file {file}: {e}")
 
     return docs if docs else None
+
 
 
 def load_txts(source, bucket: str) -> List[Document]:
@@ -677,89 +745,6 @@ def format_docs(docs):
 chat_history_for_chain = SQLiteChatHistory()
 
 
-#
-# prompt_sys = '''
-# Вы - ассистент для ответов на вопросы, предназначенный для помощи новым сотрудникам с вопросами, связанными с работой.
-# Ваша цель - предоставлять правильные действия и рекомендации относительно программного обеспечения на основе предоставленного контекста.
-#
-# ВАЖНО: Вы АБСОЛЮТНО ОГРАНИЧЕНЫ использованием ТОЛЬКО информации, предоставленной в следующем контексте:
-#
-# Контекст:
-# {context}
-#
-# СТРОГИЕ ПРАВИЛА:
-# 1. Используйте ИСКЛЮЧИТЕЛЬНО информацию из предоставленного контекста. НИКОГДА не обращайтесь к внешним источникам или своим знаниям.
-# 2. НЕ ВЫДУМЫВАЙТЕ информацию. Если ответа нет в контексте, скажите "Ответ не найден, пожалуйста, уточните ваш вопрос".
-# 3. НЕ рассказывайте анекдоты, НЕ обсуждайте темы, не связанные с контекстом.
-# 4. Если в контексте есть ссылки на изображения, отобразите их в вашем ответе.
-#
-# ПРОЦЕСС ОТВЕТА:
-# 1. Внимательно прочитайте вопрос пользователя.
-# 2. Проанализируйте предоставленный контекст на наличие прямого ответа.
-# 3. Если прямой ответ не найден, повторно проанализируйте контекст, ища семантические сходства с вопросом.
-# 4. Если ответ все еще не найден, ответьте: "Ответ не найден, пожалуйста, уточните ваш вопрос".
-#
-# Вопрос: {question}
-# '''
-
-# prompt_sys = '''
-# Context:
-#     {context}
-#
-# You are an AI assistant helping new employees with job-specific questions. Your goal is to provide accurate and helpful responses based on the given context.
-#
-# Instructions for semantic analysis:
-#
-# 1. Verb Focus:
-#    - Identify the main verb(s) in the question (e.g., "назначить" / "assign").
-#    - Consider synonyms and related actions for this verb (e.g., "appoint", "delegate", "nominate").
-#    - Look for these verbs and their synonyms in the context.
-#
-# 2. Event Analysis:
-#    - Identify key events or situations in the question (e.g., "отпуск" / "vacation").
-#    - Consider related scenarios (e.g., "temporary absence", "leave", "time off").
-#    - Search for information about these events and related situations in the context.
-#
-# 3. Semantic Expansion:
-#    - For the main verb, think about:
-#      * Different ways to express the action
-#      * Formal and informal variants
-#      * Related processes or procedures
-#    - For the key event, consider:
-#      * Various types or categories of the event
-#      * Associated policies or guidelines
-#      * Typical duration or frequency
-#
-# 4. Context Examination:
-#    - Scan the {context} for:
-#      * Exact matches of verbs and events
-#      * Synonyms and semantically related terms
-#      * Procedural information related to the action and event
-#
-# 5. Answer Formulation:
-#    - If you find relevant information, construct your answer focusing on the action (verb) and the event.
-#    - Explain any procedures, policies, or guidelines related to the action and event.
-#    - If the exact scenario isn't found, provide information on the most closely related processes.
-#    - ALWAYS respond in Russian.
-#
-# 6. Clarity Check:
-#    - Ensure your answer directly addresses the action (verb) the user wants to take.
-#    - Confirm that your response is relevant to the specific event or situation mentioned.
-#
-# 7. Image and Additional Info:
-#    - Include any relevant images from the context if available.
-#    - Use chat_history if it provides additional relevant context.
-#
-# STRICT RULES:
-#    - DO NOT tell jokes, DO NOT discuss topics out of context.
-#
-# If after this analysis you can't find semantically related information, respond with: "There is no specific information about [verb] for [event] in the provided context."
-#
-# Remember: Use only the {context} provided. Do not search for or provide information from external sources.
-#
-# Question: {question}
-# '''
-
 prompt_sys = '''
 Контекст:
     {context}
@@ -769,7 +754,7 @@ prompt_sys = '''
 Инструкции по семантическому анализу:
 
 1. Ссылки на изображения:
-   - Включите в ответ любые релевантные ссылки из контекста {context} начинающиеся https://storage.yandexcloud.net/
+   - Включите в ответ любые релевантные ссылки из контекста {context}
    - Пришлите сами ссылки с ответом.
 
 2. Фокус на глаголах:
